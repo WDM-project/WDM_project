@@ -121,6 +121,7 @@ def add_item(order_id, item_id):
     try:
         pipe.watch(order_key)
         order_data = pipe.hgetall(order_key)
+        pipe.execute()
         if not order_data:
             return jsonify({"error": "Order not found"}), 400
         item_price = get_item_price(item_id)
@@ -144,6 +145,7 @@ def remove_item(order_id, item_id):
     try:
         pipe.watch(order_key)
         order_data = pipe.hgetall(order_key)
+        pipe.execute()
         if not order_data:
             return jsonify({"error": "Order not found"}), 400
         item_price = get_item_price(item_id)
@@ -170,6 +172,7 @@ def find_order(order_id):
     try:
         pipe.watch(order_key)
         order_data = pipe.hgetall(order_key)
+        pipe.execute()
         if not order_data:
             return jsonify({"error": "Order not found"}), 400
         order = {
@@ -187,6 +190,7 @@ def checkout(order_id):
     try:
         pipe.watch(order_key)
         order_data = pipe.hgetall(order_key)
+        pipe.execute()
         if not order_data:
             return jsonify({"error": "Order not found"}), 400
         user_id = order_data[b"user_id"].decode()
@@ -194,7 +198,7 @@ def checkout(order_id):
         payment_response = process_payment(user_id, order_id, total_cost)
 
         if payment_response == True:
-            items = eval(order_data[b"items"].decode())
+            items = json.loads(order_data[b"items"].decode())
             revert_order_items = []
             for item_id in items:
                 # ************ pay special attetion here, may need changes later ************
@@ -206,7 +210,10 @@ def checkout(order_id):
                             add_stock_quantity(item_id, 1)
                         return jsonify({"error": "Not enough stock"}), 400
                 revert_order_items.append(item_id)
-            db.hmset(order_key, {"items": str(items), "paid": "True"})
+            pipe.multi()
+            pipe.hset(order_key, "items", json.dumps(items))
+            pipe.hset(order_key, {"items": str(items), "paid": "True"})
+            pipe.execute()
             return jsonify({"status": "success"}), 200
         else:
             return jsonify({"error": "Payment failed"}), 400
