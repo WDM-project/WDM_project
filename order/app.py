@@ -89,6 +89,7 @@ def create_order(user_id):
     key = "order:" + order_id
     items = []
     try:
+         pipe.multi()
          pipe.hset(key, "order_id", order_id)
          pipe.hset(key, "paid", "False")
          pipe.hset(key, "items", json.dumps(items))
@@ -105,6 +106,7 @@ def create_order(user_id):
 def remove_order(order_id):
     pipe = db.pipeline(transaction=True)
     try:
+        pipe.multi()
         pipe.delete(f"order:{order_id}")
         pipe.execute()
         return jsonify({"status": "success"}), 200
@@ -117,16 +119,17 @@ def add_item(order_id, item_id):
     order_key = f"order:{order_id}"
     pipe = db.pipeline(transaction=True)
     try:
-        order_data = db.hgetall(order_key)
+        pipe.watch(order_key)
+        order_data = pipe.hgetall(order_key)
         if not order_data:
             return jsonify({"error": "Order not found"}), 400
         item_price = get_item_price(item_id)
         if item_price is None:
             return jsonify({"error": "Item not found"}), 400
-    
         items = json.loads(order_data[b"items"].decode())
         items.append(item_id)
         total_cost = int(order_data[b"total_cost"]) + item_price
+        pipe.multi()
         pipe.hset(order_key, "items", json.dumps(items))
         pipe.hset(order_key, "total_cost", total_cost)
         pipe.execute()
@@ -137,63 +140,75 @@ def add_item(order_id, item_id):
 @app.delete("/removeItem/<order_id>/<item_id>")
 def remove_item(order_id, item_id):
     order_key = f"order:{order_id}"
-    order_data = db.hgetall(order_key)
-    if not order_data:
-        return jsonify({"error": "Order not found"}), 400
-
-    item_price = get_item_price(item_id)
-    if item_price is None:
-        return jsonify({"error": "Item not found"}), 400
-
-    items = eval(order_data[b"items"].decode())
-    if item_id not in items:
-        return jsonify({"error": "Item not in order"}), 400
-
-    items.remove(item_id)
-    total_cost = int(order_data[b"total_cost"]) - item_price
-    # add_stock_quantity(item_id, 1)
-    db.hmset(order_key, {"items": str(items), "total_cost": total_cost})
-    return jsonify({"status": "success"}), 200
-
+    pipe = db.pipeline(transaction=True)
+    try:
+        pipe.watch(order_key)
+        order_data = pipe.hgetall(order_key)
+        if not order_data:
+            return jsonify({"error": "Order not found"}), 400
+        item_price = get_item_price(item_id)
+        if item_price is None:
+            return jsonify({"error": "Item not found"}), 400
+        items = json.loads(order_data[b"items"].decode())
+        if item_id not in items:
+            return jsonify({"error": "Item not in order"}), 400
+        items.remove(item_id)
+        total_cost = int(order_data[b"total_cost"]) - item_price
+        pipe.multi()
+        pipe.hset(order_key, "items", json.dumps(items))
+        pipe.hset(order_key, "total_cost", total_cost)
+        pipe.execute()
+        return jsonify({"status": "success"}), 200
+    except Exception as e:
+        return str(e), 400
+    
 
 @app.get("/find/<order_id>")
 def find_order(order_id):
     order_key = f"order:{order_id}"
-    order_data = db.hgetall(order_key)
-    if not order_data:
-        return jsonify({"error": "Order not found"}), 400
-    order = {
-        key.decode(): (value.decode() if key != b"items" else eval(value.decode()))
-        for key, value in order_data.items()
-    }
-
-    return jsonify(order), 200
-
+    pipe = db.pipeline(transaction=True)
+    try:
+        pipe.watch(order_key)
+        order_data = pipe.hgetall(order_key)
+        if not order_data:
+            return jsonify({"error": "Order not found"}), 400
+        order = {
+            key.decode(): (value.decode() if key != b"items" else json.loads(value.decode()))
+            for key, value in order_data.items()
+        }
+        return jsonify(order), 200
+    except Exception as e:
+        return str(e), 400
 
 @app.post("/checkout/<order_id>")
 def checkout(order_id):
     order_key = f"order:{order_id}"
-    order_data = db.hgetall(order_key)
-    if not order_data:
-        return jsonify({"error": "Order not found"}), 400
-    user_id = order_data[b"user_id"].decode()
-    total_cost = int(order_data[b"total_cost"])
-    payment_response = process_payment(user_id, order_id, total_cost)
+    pipe = db.pipeline(transaction=True)
+    try:
+        pipe.watch(order_key)
+        order_data = pipe.hgetall(order_key)
+        if not order_data:
+            return jsonify({"error": "Order not found"}), 400
+        user_id = order_data[b"user_id"].decode()
+        total_cost = int(order_data[b"total_cost"])
+        payment_response = process_payment(user_id, order_id, total_cost)
 
-    if payment_response == True:
-        items = eval(order_data[b"items"].decode())
-        revert_order_items = []
-        for item_id in items:
-            # ************ pay special attetion here, may need changes later ************
-            # this place has bug, if one item is not enough, the whole order will be canceled
-            if not subtract_stock_quantity(item_id, 1):
-                cancel_response = cancel_payment(user_id, order_id)
-                if cancel_response == True:
-                    for item_id in revert_order_items:
-                        add_stock_quantity(item_id, 1)
-                    return jsonify({"error": "Not enough stock"}), 400
-            revert_order_items.append(item_id)
-        db.hmset(order_key, {"items": str(items), "paid": "True"})
-        return jsonify({"status": "success"}), 200
-    else:
-        return jsonify({"error": "Payment failed"}), 400
+        if payment_response == True:
+            items = eval(order_data[b"items"].decode())
+            revert_order_items = []
+            for item_id in items:
+                # ************ pay special attetion here, may need changes later ************
+                # this place has bug, if one item is not enough, the whole order will be canceled
+                if not subtract_stock_quantity(item_id, 1):
+                    cancel_response = cancel_payment(user_id, order_id)
+                    if cancel_response == True:
+                        for item_id in revert_order_items:
+                            add_stock_quantity(item_id, 1)
+                        return jsonify({"error": "Not enough stock"}), 400
+                revert_order_items.append(item_id)
+            db.hmset(order_key, {"items": str(items), "paid": "True"})
+            return jsonify({"status": "success"}), 200
+        else:
+            return jsonify({"error": "Payment failed"}), 400
+    except Exception as e:
+        return str(e), 400
