@@ -70,7 +70,7 @@ def process_payment(user_id, order_id, total_cost):
         response = requests.post(
             f"{gateway_url}/payment/pay/{user_id}/{order_id}/{total_cost}"
         )
-    return response.status_code == 200
+    return response
 
 
 def cancel_payment(user_id, order_id):
@@ -89,41 +89,54 @@ def create_order(user_id):
     key = "order:" + order_id
     items = []
     try:
-         pipe.multi()
-         pipe.hset(key, "order_id", order_id)
-         pipe.hset(key, "paid", "False")
-         pipe.hset(key, "items", json.dumps(items))
-         pipe.hset(key, "user_id", user_id)
-         pipe.hset(key, "total_cost", 0)
-         pipe.execute()
-         return jsonify({"order_id": order_id}), 200
+        pipe.multi()
+        pipe.hset(key, "order_id", order_id)
+        pipe.hset(key, "paid", "False")
+        pipe.hset(key, "items", json.dumps(items))
+        pipe.hset(key, "user_id", user_id)
+        pipe.hset(key, "total_cost", 0)
+        pipe.execute()
+        return jsonify({"order_id": order_id}), 200
     except Exception as e:
         # If an error occurs the transaction will be aborted and no commands will be executed.
-        return str(e), 400
+        return str(e), 500
+    finally:
+        # Resetting the pipeline will restore it to its initial state.
+        pipe.reset()
 
 
 @app.delete("/remove/<order_id>")
 def remove_order(order_id):
     pipe = db.pipeline(transaction=True)
     try:
-        pipe.multi()
         pipe.delete(f"order:{order_id}")
-        pipe.execute()
+        result = pipe.execute()
+        if result[0] == 0:
+            return jsonify({"error": "Order not found"}), 400
         return jsonify({"status": "success"}), 200
     except Exception as e:
-        return str(e), 400
+        return str(e), 500
+    finally:
+        pipe.reset()
 
 
 @app.post("/addItem/<order_id>/<item_id>")
 def add_item(order_id, item_id):
     order_key = f"order:{order_id}"
+
     pipe = db.pipeline(transaction=True)
     try:
         pipe.watch(order_key)
-        order_data = pipe.hgetall(order_key)
-        pipe.execute()
-        if not order_data:
-            return jsonify({"error": "Order not found"}), 400
+        pipe.multi()
+        pipe.exists(order_key)
+        pipe.hgetall(order_key)
+        result = pipe.execute()
+        # app.logger.debug(f"Pipeline result: {result}")
+        if not result:
+            return jsonify({"error": "Result Error In Pipe Execution"}), 400
+        if not result[0]:
+            return jsonify({"error": "The order_key does not exist"}), 400
+        order_data = result[1]
         item_price = get_item_price(item_id)
         if item_price is None:
             return jsonify({"error": "Item not found"}), 400
@@ -136,7 +149,10 @@ def add_item(order_id, item_id):
         pipe.execute()
         return jsonify({"status": "success"}), 200
     except Exception as e:
-        return str(e), 400
+        return str({"error": str(e), "type": str(type(e))}), 500
+    finally:
+        pipe.unwatch()
+
 
 @app.delete("/removeItem/<order_id>/<item_id>")
 def remove_item(order_id, item_id):
@@ -144,8 +160,10 @@ def remove_item(order_id, item_id):
     pipe = db.pipeline(transaction=True)
     try:
         pipe.watch(order_key)
-        order_data = pipe.hgetall(order_key)
-        pipe.execute()
+        pipe.multi()
+        pipe.hgetall(order_key)
+        result = pipe.execute()
+        order_data = result[0]
         if not order_data:
             return jsonify({"error": "Order not found"}), 400
         item_price = get_item_price(item_id)
@@ -162,8 +180,10 @@ def remove_item(order_id, item_id):
         pipe.execute()
         return jsonify({"status": "success"}), 200
     except Exception as e:
-        return str(e), 400
-    
+        return str(e), 500
+    finally:
+        pipe.unwatch()
+
 
 @app.get("/find/<order_id>")
 def find_order(order_id):
@@ -171,17 +191,24 @@ def find_order(order_id):
     pipe = db.pipeline(transaction=True)
     try:
         pipe.watch(order_key)
-        order_data = pipe.hgetall(order_key)
-        pipe.execute()
+        pipe.multi()
+        pipe.hgetall(order_key)
+        result = pipe.execute()
+        order_data = result[0]
         if not order_data:
             return jsonify({"error": "Order not found"}), 400
         order = {
-            key.decode(): (value.decode() if key != b"items" else json.loads(value.decode()))
+            key.decode(): (
+                value.decode() if key != b"items" else json.loads(value.decode())
+            )
             for key, value in order_data.items()
         }
         return jsonify(order), 200
     except Exception as e:
-        return str(e), 400
+        return str(e), 500
+    finally:
+        pipe.unwatch()
+
 
 @app.post("/checkout/<order_id>")
 def checkout(order_id):
@@ -189,15 +216,17 @@ def checkout(order_id):
     pipe = db.pipeline(transaction=True)
     try:
         pipe.watch(order_key)
-        order_data = pipe.hgetall(order_key)
-        pipe.execute()
+        pipe.multi()
+        pipe.hgetall(order_key)
+        result = pipe.execute()
+        order_data = result[0]
         if not order_data:
             return jsonify({"error": "Order not found"}), 400
         user_id = order_data[b"user_id"].decode()
         total_cost = int(order_data[b"total_cost"])
         payment_response = process_payment(user_id, order_id, total_cost)
 
-        if payment_response == True:
+        if payment_response.status_code == 200:
             items = json.loads(order_data[b"items"].decode())
             revert_order_items = []
             for item_id in items:
@@ -211,11 +240,16 @@ def checkout(order_id):
                         return jsonify({"error": "Not enough stock"}), 400
                 revert_order_items.append(item_id)
             pipe.multi()
-            pipe.hset(order_key, "items", json.dumps(items))
-            pipe.hset(order_key, {"items": str(items), "paid": "True"})
+            # pipe.hset(order_key, "items", json.dumps(items))
+            pipe.hset(order_key, "paid", "True")
             pipe.execute()
             return jsonify({"status": "success"}), 200
         else:
-            return jsonify({"error": "Payment failed"}), 400
+            return (
+                jsonify({"error": payment_response.text}),
+                payment_response.status_code,
+            )
     except Exception as e:
-        return str(e), 400
+        return str(e), 500
+    finally:
+        pipe.unwatch()

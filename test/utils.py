@@ -1,8 +1,6 @@
 import requests
 
-# ORDER_URL = STOCK_URL = PAYMENT_URL = "http://127.0.0.1:80"
 ORDER_URL = STOCK_URL = PAYMENT_URL = "http://127.0.0.1:8000"
-
 
 
 ########################################################################################################################
@@ -55,8 +53,7 @@ def create_order(user_id: str) -> dict:
 
 
 def add_item_to_order(order_id: str, item_id: str) -> int:
-    res = requests.post(f"{ORDER_URL}/orders/addItem/{order_id}/{item_id}")
-    return res.status_code
+    return requests.post(f"{ORDER_URL}/orders/addItem/{order_id}/{item_id}").status_code
 
 
 def find_order(order_id: str) -> dict:
@@ -64,7 +61,9 @@ def find_order(order_id: str) -> dict:
 
 
 def checkout_order(order_id: str) -> requests.Response:
-    return requests.post(f"{ORDER_URL}/orders/checkout/{order_id}")
+    temp = requests.post(f"{ORDER_URL}/orders/checkout/{order_id}")
+    print(temp.text)
+    return temp
 
 
 ########################################################################################################################
