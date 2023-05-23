@@ -9,7 +9,8 @@ from dtmcli import saga
 from dtmcli import utils
 from dtmcli import msg
 
-dtm = "http://localhost:36789/api/dtmsvr"
+# dtm = "http://localhost:36789/api/dtmsvr"
+dtm = "http://dtm:36789/api/dtmsvr"
 notification_service_url = "http://localhost:8000/notifications"
 
 app = Flask("order-service")
@@ -242,27 +243,27 @@ def checkout(order_id):
         )
 
         # Add a step for each item in the order
-        for item_id in items:
-            s.add(
-                {"item_id": item_id, "quantity": 1},
-                f"{gateway_url}/stock/subtract/{item_id}/1",
-                f"{gateway_url}/stock/add/{item_id}/1"
-            )
+        # for item_id in items:
+        #     s.add(
+        #         {"item_id": item_id, "quantity": 1},
+        #         f"{gateway_url}/stock/subtract/{item_id}/1",
+        #         f"{gateway_url}/stock/add/{item_id}/1"
+        #     )
 
         # Submit the Saga transaction
         s.submit()
 
         # Create a new Msg transaction for notifying the user
-        m = msg.Msg(dtm, utils.gen_gid(dtm))
+        # m = msg.Msg(dtm, utils.gen_gid(dtm))
 
-        # Add a step for sending an order confirmation email
-        m.add(
-            {"user_id": user_id, "order_id": order_id},
-            f"{notification_service_url}/send_order_confirmation/{user_id}/{order_id}"
-        )
+        # # Add a step for sending an order confirmation email
+        # m.add(
+        #     {"user_id": user_id, "order_id": order_id},
+        #     f"{notification_service_url}/send_order_confirmation/{user_id}/{order_id}"
+        # )
 
-        # Submit the Msg transaction
-        m.submit()
+        # # Submit the Msg transaction
+        # m.submit()
 
         # Mark the order as paid
         pipe.multi()

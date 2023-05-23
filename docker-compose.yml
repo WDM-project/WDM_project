@@ -42,3 +42,16 @@ services:
   payment-db:
     image: redis:latest
     command: redis-server --requirepass redis --maxmemory 512mb
+  
+  dtm:
+    image: yedf/dtm
+    environment:
+      IS_DOCKER: 1
+      STORE_DRIVER: redis
+      STORE_HOST: order-db
+      STORE_USER: ''
+      STORE_PASSWORD: 'redis'
+      STORE_PORT: 6379
+    ports:
+      - '36789:36789'
+      - '36790:36790'
