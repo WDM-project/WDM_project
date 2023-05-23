@@ -5,6 +5,11 @@ import requests
 from flask import Flask, jsonify
 import redis
 import json
+from dtmcli import saga
+from dtmcli import utils
+from dtmcli import msg
+
+dtm = "http://localhost:36789/api/dtmsvr"
 
 app = Flask("order-service")
 
@@ -209,7 +214,6 @@ def find_order(order_id):
     finally:
         pipe.unwatch()
 
-
 @app.post("/checkout/<order_id>")
 def checkout(order_id):
     order_key = f"order:{order_id}"
@@ -224,32 +228,49 @@ def checkout(order_id):
             return jsonify({"error": "Order not found"}), 400
         user_id = order_data[b"user_id"].decode()
         total_cost = int(order_data[b"total_cost"])
-        payment_response = process_payment(user_id, order_id, total_cost)
+        items = json.loads(order_data[b"items"].decode())
 
-        if payment_response.status_code == 200:
-            items = json.loads(order_data[b"items"].decode())
-            revert_order_items = []
-            for item_id in items:
-                # ************ pay special attetion here, may need changes later ************
-                # this place has bug, if one item is not enough, the whole order will be canceled
-                if not subtract_stock_quantity(item_id, 1):
-                    cancel_response = cancel_payment(user_id, order_id)
-                    if cancel_response == True:
-                        for item_id in revert_order_items:
-                            add_stock_quantity(item_id, 1)
-                        return jsonify({"error": "Not enough stock"}), 400
-                revert_order_items.append(item_id)
-            pipe.multi()
-            # pipe.hset(order_key, "items", json.dumps(items))
-            pipe.hset(order_key, "paid", "True")
-            pipe.execute()
-            return jsonify({"status": "success"}), 200
-        else:
-            return (
-                jsonify({"error": payment_response.text}),
-                payment_response.status_code,
+        # Create a new Saga transaction
+        s = saga.Saga(dtm, utils.gen_gid(dtm))
+
+        # Add a step for processing the payment
+        s.add(
+            {"user_id": user_id, "order_id": order_id, "total_cost": total_cost},
+            f"{user_service_url}/pay/{user_id}/{order_id}/{total_cost}",
+            f"{user_service_url}/refund/{user_id}/{order_id}/{total_cost}"
+        )
+
+        # Add a step for each item in the order
+        for item_id in items:
+            s.add(
+                {"item_id": item_id, "quantity": 1},
+                f"{stock_service_url}/subtract/{item_id}/1",
+                f"{stock_service_url}/add/{item_id}/1"
             )
+
+        # Submit the Saga transaction
+        s.submit()
+
+        # Create a new Msg transaction for notifying the user
+        m = msg.Msg(dtm, utils.gen_gid(dtm))
+
+        # Add a step for sending an order confirmation email
+        m.add(
+            {"user_id": user_id, "order_id": order_id},
+            f"{notification_service_url}/send_order_confirmation/{user_id}/{order_id}"
+        )
+
+        # Submit the Msg transaction
+        m.submit()
+
+        # Mark the order as paid
+        pipe.multi()
+        pipe.hset(order_key, "paid", "True")
+        pipe.execute()
+        return jsonify({"status": "success"}), 200
     except Exception as e:
         return str(e), 500
     finally:
         pipe.unwatch()
+
+
