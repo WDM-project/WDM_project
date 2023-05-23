@@ -10,6 +10,7 @@ from dtmcli import utils
 from dtmcli import msg
 
 dtm = "http://localhost:36789/api/dtmsvr"
+notification_service_url = "http://localhost:8000/notifications"
 
 app = Flask("order-service")
 
@@ -236,16 +237,16 @@ def checkout(order_id):
         # Add a step for processing the payment
         s.add(
             {"user_id": user_id, "order_id": order_id, "total_cost": total_cost},
-            f"{user_service_url}/pay/{user_id}/{order_id}/{total_cost}",
-            f"{user_service_url}/refund/{user_id}/{order_id}/{total_cost}"
+            f"{gateway_url}/payment/pay/{user_id}/{order_id}/{total_cost}",
+            f"{gateway_url}/payment/add_funds/{user_id}/{total_cost}"
         )
 
         # Add a step for each item in the order
         for item_id in items:
             s.add(
                 {"item_id": item_id, "quantity": 1},
-                f"{stock_service_url}/subtract/{item_id}/1",
-                f"{stock_service_url}/add/{item_id}/1"
+                f"{gateway_url}/stock/subtract/{item_id}/1",
+                f"{gateway_url}/stock/add/{item_id}/1"
             )
 
         # Submit the Saga transaction
