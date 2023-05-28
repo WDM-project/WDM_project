@@ -43,7 +43,9 @@ def find_item(item_id: str):
     # pipe = db.pipeline(transaction=True)
     try:
         # pipe.watch(item_key)
+        print("item_key, ", item_key)
         item_data = db.hgetall(item_key)
+        print("item_data, ", item_data)
         if not item_data:
             return jsonify({"error": "Item not found"}), 400
         return (

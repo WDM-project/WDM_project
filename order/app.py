@@ -131,6 +131,7 @@ def add_item(order_id, item_id):
         pipe.exists(order_key)
         pipe.hgetall(order_key)
         result = pipe.execute()
+        print("add_item, result === ", result)
         # app.logger.debug(f"Pipeline result: {result}")
         if not result:
             return jsonify({"error": "Result Error In Pipe Execution"}), 400
@@ -157,13 +158,16 @@ def add_item(order_id, item_id):
 @app.delete("/removeItem/<order_id>/<item_id>")
 def remove_item(order_id, item_id):
     order_key = f"order:{order_id}"
+    print("remove_item, order_key === ", order_key)
     pipe = db.pipeline(transaction=True)
     try:
         pipe.watch(order_key)
         pipe.multi()
         pipe.hgetall(order_key)
         result = pipe.execute()
+        print("remove_item, result === ", result)
         order_data = result[0]
+        print("remove_item, order_data === ", order_data)
         if not order_data:
             return jsonify({"error": "Order not found"}), 400
         item_price = get_item_price(item_id)
