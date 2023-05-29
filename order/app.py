@@ -213,7 +213,6 @@ def find_order(order_id):
     finally:
         pipe.unwatch()
 
-
 @app.post("/checkout/<order_id>")
 def checkout(order_id):
     order_key = f"order:{order_id}"
@@ -226,34 +225,84 @@ def checkout(order_id):
         order_data = result[0]
         if not order_data:
             return jsonify({"error": "Order not found"}), 400
+        
+        # if we have order_data:
         user_id = order_data[b"user_id"].decode()
         total_cost = int(order_data[b"total_cost"])
-        payment_response = process_payment(user_id, order_id, total_cost)
 
+        # Start of stock check
+        items = json.loads(order_data[b"items"].decode())
+        revert_order_items = []
+        for item_id in items:
+            if not subtract_stock_quantity(item_id, 1):  # Check if there's enough stock for each item
+                for item_id in revert_order_items:
+                    add_stock_quantity(item_id, 1)  # Revert the stock changes if there's not enough stock for any item
+                return jsonify({"error": "Not enough stock"}), 400
+            revert_order_items.append(item_id)
+        # End of stock check
+
+        # Start of payment processing
+        payment_response = process_payment(user_id, order_id, total_cost)  # Process the payment
         if payment_response.status_code == 200:
-            items = json.loads(order_data[b"items"].decode())
-            revert_order_items = []
-            for item_id in items:
-                # ************ pay special attetion here, may need changes later ************
-                # this place has bug, if one item is not enough, the whole order will be canceled
-                if not subtract_stock_quantity(item_id, 1):
-                    cancel_response = cancel_payment(user_id, order_id)
-                    if cancel_response == True:
-                        for item_id in revert_order_items:
-                            add_stock_quantity(item_id, 1)
-                        return jsonify({"error": "Not enough stock"}), 400
-                revert_order_items.append(item_id)
             pipe.multi()
-            # pipe.hset(order_key, "items", json.dumps(items))
             pipe.hset(order_key, "paid", "True")
             pipe.execute()
             return jsonify({"status": "success"}), 200
         else:
+            for item_id in revert_order_items:
+                add_stock_quantity(item_id, 1)  # Revert the stock changes if the payment fails
             return (
                 jsonify({"error": payment_response.text}),
                 payment_response.status_code,
             )
+        # End of payment processing
     except Exception as e:
         return str(e), 500
     finally:
         pipe.unwatch()
+
+
+# this would fail
+# @app.post("/checkout/<order_id>")
+# def checkout(order_id):
+#     order_key = f"order:{order_id}"
+#     pipe = db.pipeline(transaction=True)
+#     try:
+#         pipe.watch(order_key)
+#         pipe.multi()
+#         pipe.hgetall(order_key)
+#         result = pipe.execute()
+#         order_data = result[0]
+#         if not order_data:
+#             return jsonify({"error": "Order not found"}), 400
+#         user_id = order_data[b"user_id"].decode()
+#         total_cost = int(order_data[b"total_cost"])
+#         payment_response = process_payment(user_id, order_id, total_cost)
+
+#         if payment_response.status_code == 200:
+#             items = json.loads(order_data[b"items"].decode())
+#             revert_order_items = []
+#             for item_id in items:
+#                 # ************ pay special attetion here, may need changes later ************
+#                 # this place has bug, if one item is not enough, the whole order will be canceled
+#                 if not subtract_stock_quantity(item_id, 1):
+#                     cancel_response = cancel_payment(user_id, order_id)
+#                     if cancel_response == True:
+#                         for item_id in revert_order_items:
+#                             add_stock_quantity(item_id, 1)
+#                         return jsonify({"error": "Not enough stock"}), 400
+#                 revert_order_items.append(item_id)
+#             pipe.multi()
+#             # pipe.hset(order_key, "items", json.dumps(items))
+#             pipe.hset(order_key, "paid", "True")
+#             pipe.execute()
+#             return jsonify({"status": "success"}), 200
+#         else:
+#             return (
+#                 jsonify({"error": payment_response.text}),
+#                 payment_response.status_code,
+#             )
+#     except Exception as e:
+#         return str(e), 500
+#     finally:
+#         pipe.unwatch()
