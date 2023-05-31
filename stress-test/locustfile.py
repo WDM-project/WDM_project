@@ -7,19 +7,22 @@ from typing import List
 from locust import HttpUser, SequentialTaskSet, between, task
 
 # replace the example urls and ports with the appropriate ones
-with open(os.path.join('..', 'urls.json')) as f:
+with open(os.path.join("..", "urls.json")) as f:
     urls = json.load(f)
-    ORDER_URL = urls['ORDER_URL']
-    PAYMENT_URL = urls['PAYMENT_URL']
-    STOCK_URL = urls['STOCK_URL']
+    ORDER_URL = urls["ORDER_URL"]
+    PAYMENT_URL = urls["PAYMENT_URL"]
+    STOCK_URL = urls["STOCK_URL"]
 
 
 def create_item(session):
     price = random.uniform(1.0, 10.0)
-    with session.client.post(f"{STOCK_URL}/stock/item/create/{price}", name="/stock/item/create/[price]",
-                             catch_response=True) as response:
+    with session.client.post(
+        f"{STOCK_URL}/stock/item/create/{int(price)}",
+        name="/stock/item/create/[price]",
+        catch_response=True,
+    ) as response:
         try:
-            item_id = response.json()['item_id']
+            item_id = response.json()["item_id"]
         except json.JSONDecodeError:
             response.failure("SERVER ERROR")
         else:
@@ -28,37 +31,50 @@ def create_item(session):
 
 def add_stock(session, item_idx: int):
     stock_to_add = random.randint(100, 1000)
-    session.client.post(f"{STOCK_URL}/stock/add/{session.item_ids[item_idx]}/{stock_to_add}",
-                        name="/stock/add/[item_id]/[number]")
+    session.client.post(
+        f"{STOCK_URL}/stock/add/{session.item_ids[item_idx]}/{stock_to_add}",
+        name="/stock/add/[item_id]/[number]",
+    )
 
 
 def create_user(session):
-    with session.client.post(f"{PAYMENT_URL}/payment/create_user", name="/payment/create_user",
-                             catch_response=True) as response:
+    with session.client.post(
+        f"{PAYMENT_URL}/payment/create_user",
+        name="/payment/create_user",
+        catch_response=True,
+    ) as response:
         try:
-            session.user_id = response.json()['user_id']
+            session.user_id = response.json()["user_id"]
         except json.JSONDecodeError:
             response.failure("SERVER ERROR")
 
 
 def add_balance_to_user(session):
     balance_to_add: float = random.uniform(10000.0, 100000.0)
-    session.client.post(f"{PAYMENT_URL}/payment/add_funds/{session.user_id}/{balance_to_add}",
-                        name="/payment/add_funds/[user_id]/[amount]")
+    session.client.post(
+        f"{PAYMENT_URL}/payment/add_funds/{session.user_id}/{balance_to_add}",
+        name="/payment/add_funds/[user_id]/[amount]",
+    )
 
 
 def create_order(session):
-    with session.client.post(f"{ORDER_URL}/orders/create/{session.user_id}", name="/orders/create/[user_id]",
-                             catch_response=True) as response:
+    with session.client.post(
+        f"{ORDER_URL}/orders/create/{session.user_id}",
+        name="/orders/create/[user_id]",
+        catch_response=True,
+    ) as response:
         try:
-            session.order_id = response.json()['order_id']
+            session.order_id = response.json()["order_id"]
         except json.JSONDecodeError:
             response.failure("SERVER ERROR")
 
 
 def add_item_to_order(session, item_idx: int):
-    with session.client.post(f"{ORDER_URL}/orders/addItem/{session.order_id}/{session.item_ids[item_idx]}",
-                             name="/orders/addItem/[order_id]/[item_id]", catch_response=True) as response:
+    with session.client.post(
+        f"{ORDER_URL}/orders/addItem/{session.order_id}/{session.item_ids[item_idx]}",
+        name="/orders/addItem/[order_id]/[item_id]",
+        catch_response=True,
+    ) as response:
         if 400 <= response.status_code < 500:
             response.failure(response.text)
         else:
@@ -66,8 +82,11 @@ def add_item_to_order(session, item_idx: int):
 
 
 def remove_item_from_order(session, item_idx: int):
-    with session.client.delete(f"{ORDER_URL}/orders/removeItem/{session.order_id}/{session.item_ids[item_idx]}",
-                               name="/orders/removeItem/[order_id]/[item_id]", catch_response=True) as response:
+    with session.client.delete(
+        f"{ORDER_URL}/orders/removeItem/{session.order_id}/{session.item_ids[item_idx]}",
+        name="/orders/removeItem/[order_id]/[item_id]",
+        catch_response=True,
+    ) as response:
         if 400 <= response.status_code < 500:
             response.failure(response.text)
         else:
@@ -75,8 +94,11 @@ def remove_item_from_order(session, item_idx: int):
 
 
 def checkout_order(session):
-    with session.client.post(f"{ORDER_URL}/orders/checkout/{session.order_id}", name="/orders/checkout/[order_id]",
-                             catch_response=True) as response:
+    with session.client.post(
+        f"{ORDER_URL}/orders/checkout/{session.order_id}",
+        name="/orders/checkout/[order_id]",
+        catch_response=True,
+    ) as response:
         if 400 <= response.status_code < 500:
             response.failure(response.text)
         else:
@@ -84,8 +106,11 @@ def checkout_order(session):
 
 
 def checkout_order_that_is_supposed_to_fail(session, reason: int):
-    with session.client.post(f"{ORDER_URL}/orders/checkout/{session.order_id}", name="/orders/checkout/[order_id]",
-                             catch_response=True) as response:
+    with session.client.post(
+        f"{ORDER_URL}/orders/checkout/{session.order_id}",
+        name="/orders/checkout/[order_id]",
+        catch_response=True,
+    ) as response:
         if 400 <= response.status_code < 500:
             response.success()
         else:
@@ -96,42 +121,51 @@ def checkout_order_that_is_supposed_to_fail(session, reason: int):
 
 
 def make_items_stock_zero(session, item_idx: int):
-    with session.client.get(f"{STOCK_URL}/stock/find/{session.item_ids[item_idx]}", name="/stock/find/[item_id]",
-                            catch_response=True) as response:
+    with session.client.get(
+        f"{STOCK_URL}/stock/find/{session.item_ids[item_idx]}",
+        name="/stock/find/[item_id]",
+        catch_response=True,
+    ) as response:
         try:
-            stock_to_subtract = response.json()['stock']
+            stock_to_subtract = response.json()["stock"]
         except json.JSONDecodeError:
             response.failure("SERVER ERROR")
         else:
-            session.client.post(f"{STOCK_URL}/stock/subtract/{session.item_ids[item_idx]}/{stock_to_subtract}",
-                                name="/stock/subtract/[item_id]/[number]")
+            session.client.post(
+                f"{STOCK_URL}/stock/subtract/{session.item_ids[item_idx]}/{stock_to_subtract}",
+                name="/stock/subtract/[item_id]/[number]",
+            )
 
 
 class LoadTest1(SequentialTaskSet):
     """
     Scenario where a stock admin creates an item and adds stock to it
     """
+
     item_ids: List[str]
 
     def on_start(self):
-        """ on_start is called when a Locust start before any task is scheduled """
+        """on_start is called when a Locust start before any task is scheduled"""
         self.item_ids = list()
 
     def on_stop(self):
-        """ on_stop is called when the TaskSet is stopping """
+        """on_stop is called when the TaskSet is stopping"""
         self.item_ids = list()
 
     @task
-    def admin_creates_item(self): create_item(self)
+    def admin_creates_item(self):
+        create_item(self)
 
     @task
-    def admin_adds_stock_to_item(self): add_stock(self, 0)
+    def admin_adds_stock_to_item(self):
+        add_stock(self, 0)
 
 
 class LoadTest2(SequentialTaskSet):
     """
     Scenario where a user checks out an order with one item inside that an admin has added stock to before
     """
+
     item_ids: List[str]
     user_id: str
     order_id: str
@@ -147,31 +181,39 @@ class LoadTest2(SequentialTaskSet):
         self.order_id = ""
 
     @task
-    def admin_creates_item(self): create_item(self)
+    def admin_creates_item(self):
+        create_item(self)
 
     @task
-    def admin_adds_stock_to_item(self): add_stock(self, 0)
+    def admin_adds_stock_to_item(self):
+        add_stock(self, 0)
 
     @task
-    def user_creates_account(self): create_user(self)
+    def user_creates_account(self):
+        create_user(self)
 
     @task
-    def user_adds_balance(self): add_balance_to_user(self)
+    def user_adds_balance(self):
+        add_balance_to_user(self)
 
     @task
-    def user_creates_order(self): create_order(self)
+    def user_creates_order(self):
+        create_order(self)
 
     @task
-    def user_adds_item_to_order(self): add_item_to_order(self, 0)
+    def user_adds_item_to_order(self):
+        add_item_to_order(self, 0)
 
     @task
-    def user_checks_out_order(self): checkout_order(self)
+    def user_checks_out_order(self):
+        checkout_order(self)
 
 
 class LoadTest3(SequentialTaskSet):
     """
     Scenario where a user checks out an order with two items inside that an admin has added stock to before
     """
+
     item_ids: List[str]
     user_id: str
     order_id: str
@@ -187,40 +229,51 @@ class LoadTest3(SequentialTaskSet):
         self.order_id = ""
 
     @task
-    def admin_creates_item1(self): create_item(self)
+    def admin_creates_item1(self):
+        create_item(self)
 
     @task
-    def admin_adds_stock_to_item1(self): add_stock(self, 0)
+    def admin_adds_stock_to_item1(self):
+        add_stock(self, 0)
 
     @task
-    def admin_creates_item2(self): create_item(self)
+    def admin_creates_item2(self):
+        create_item(self)
 
     @task
-    def admin_adds_stock_to_item2(self): add_stock(self, 1)
+    def admin_adds_stock_to_item2(self):
+        add_stock(self, 1)
 
     @task
-    def user_creates_account(self): create_user(self)
+    def user_creates_account(self):
+        create_user(self)
 
     @task
-    def user_adds_balance(self): add_balance_to_user(self)
+    def user_adds_balance(self):
+        add_balance_to_user(self)
 
     @task
-    def user_creates_order(self): create_order(self)
+    def user_creates_order(self):
+        create_order(self)
 
     @task
-    def user_adds_item1_to_order(self): add_item_to_order(self, 0)
+    def user_adds_item1_to_order(self):
+        add_item_to_order(self, 0)
 
     @task
-    def user_adds_item2_to_order(self): add_item_to_order(self, 1)
+    def user_adds_item2_to_order(self):
+        add_item_to_order(self, 1)
 
     @task
-    def user_checks_out_order(self): checkout_order(self)
+    def user_checks_out_order(self):
+        checkout_order(self)
 
 
 class LoadTest4(SequentialTaskSet):
     """
     Scenario where a user adds an item to an order, regrets it and removes it and then adds it back and checks out
     """
+
     item_ids: List[str]
     user_id: str
     order_id: str
@@ -236,37 +289,47 @@ class LoadTest4(SequentialTaskSet):
         self.order_id = ""
 
     @task
-    def admin_creates_item(self): create_item(self)
+    def admin_creates_item(self):
+        create_item(self)
 
     @task
-    def admin_adds_stock_to_item(self): add_stock(self, 0)
+    def admin_adds_stock_to_item(self):
+        add_stock(self, 0)
 
     @task
-    def user_creates_account(self): create_user(self)
+    def user_creates_account(self):
+        create_user(self)
 
     @task
-    def user_adds_balance(self): add_balance_to_user(self)
+    def user_adds_balance(self):
+        add_balance_to_user(self)
 
     @task
-    def user_creates_order(self): create_order(self)
+    def user_creates_order(self):
+        create_order(self)
 
     @task
-    def user_adds_item_to_order(self): add_item_to_order(self, 0)
+    def user_adds_item_to_order(self):
+        add_item_to_order(self, 0)
 
     @task
-    def user_removes_item_from_order(self): remove_item_from_order(self, 0)
+    def user_removes_item_from_order(self):
+        remove_item_from_order(self, 0)
 
     @task
-    def user_adds_item_to_order_again(self): add_item_to_order(self, 0)
+    def user_adds_item_to_order_again(self):
+        add_item_to_order(self, 0)
 
     @task
-    def user_checks_out_order(self): checkout_order(self)
+    def user_checks_out_order(self):
+        checkout_order(self)
 
 
 class LoadTest5(SequentialTaskSet):
     """
     Scenario that is supposed to fail because the second item does not have enough stock
     """
+
     item_ids: List[str]
     user_id: str
     order_id: str
@@ -282,43 +345,55 @@ class LoadTest5(SequentialTaskSet):
         self.order_id = ""
 
     @task
-    def admin_creates_item1(self): create_item(self)
+    def admin_creates_item1(self):
+        create_item(self)
 
     @task
-    def admin_adds_stock_to_item1(self): add_stock(self, 0)
+    def admin_adds_stock_to_item1(self):
+        add_stock(self, 0)
 
     @task
-    def admin_creates_item2(self): create_item(self)
+    def admin_creates_item2(self):
+        create_item(self)
 
     @task
-    def admin_adds_stock_to_item2(self): add_stock(self, 1)
+    def admin_adds_stock_to_item2(self):
+        add_stock(self, 1)
 
     @task
-    def user_creates_account(self): create_user(self)
+    def user_creates_account(self):
+        create_user(self)
 
     @task
-    def user_adds_balance(self): add_balance_to_user(self)
+    def user_adds_balance(self):
+        add_balance_to_user(self)
 
     @task
-    def user_creates_order(self): create_order(self)
+    def user_creates_order(self):
+        create_order(self)
 
     @task
-    def user_adds_item1_to_order(self): add_item_to_order(self, 0)
+    def user_adds_item1_to_order(self):
+        add_item_to_order(self, 0)
 
     @task
-    def user_adds_item2_to_order(self): add_item_to_order(self, 1)
+    def user_adds_item2_to_order(self):
+        add_item_to_order(self, 1)
 
     @task
-    def stock_admin_makes_item2s_stock_zero(self): make_items_stock_zero(self, 1)
+    def stock_admin_makes_item2s_stock_zero(self):
+        make_items_stock_zero(self, 1)
 
     @task
-    def user_checks_out_order(self): checkout_order_that_is_supposed_to_fail(self, 0)
+    def user_checks_out_order(self):
+        checkout_order_that_is_supposed_to_fail(self, 0)
 
 
 class LoadTest6(SequentialTaskSet):
     """
     Scenario that is supposed to fail because the user does not have enough credit
     """
+
     item_ids: List[str]
     user_id: str
     order_id: str
@@ -334,22 +409,28 @@ class LoadTest6(SequentialTaskSet):
         self.order_id = ""
 
     @task
-    def admin_creates_item(self): create_item(self)
+    def admin_creates_item(self):
+        create_item(self)
 
     @task
-    def admin_adds_stock_to_item(self): add_stock(self, 0)
+    def admin_adds_stock_to_item(self):
+        add_stock(self, 0)
 
     @task
-    def user_creates_account(self): create_user(self)
+    def user_creates_account(self):
+        create_user(self)
 
     @task
-    def user_creates_order(self): create_order(self)
+    def user_creates_order(self):
+        create_order(self)
 
     @task
-    def user_adds_item_to_order(self): add_item_to_order(self, 0)
+    def user_adds_item_to_order(self):
+        add_item_to_order(self, 0)
 
     @task
-    def user_checks_out_order(self): checkout_order_that_is_supposed_to_fail(self, 1)
+    def user_checks_out_order(self):
+        checkout_order_that_is_supposed_to_fail(self, 1)
 
 
 class MicroservicesUser(HttpUser):
@@ -362,5 +443,5 @@ class MicroservicesUser(HttpUser):
         LoadTest3: 25,
         LoadTest4: 20,
         LoadTest5: 10,
-        LoadTest6: 10
+        LoadTest6: 10,
     }

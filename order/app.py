@@ -5,24 +5,12 @@ import requests
 from flask import Flask, jsonify, request
 import redis
 import json
-from dtmcli import saga
-from dtmcli import utils
-from dtmcli import barrier
-import pymysql
+
+import saga
+import barrier
+import utils
 
 dtm = "http://dtm:36789/api/dtmsvr"
-
-dbconf = {"host": "localhost", "port": "3306", "user": "root", "password": ""}
-
-
-def conn_new():
-    print("connecting: ", dbconf)
-    return pymysql.connect(
-        host=dbconf["host"],
-        user=dbconf["user"],
-        password=dbconf["password"],
-        database="",
-    ).cursor()
 
 
 def barrier_from_req(request):
@@ -111,6 +99,14 @@ def cancel_payment(user_id, order_id):
     return response.status_code == 200
 
 
+# def get_payment_status(user_id, order_id):
+#     if running_in_kubernetes:
+#         response = requests.get(f"{user_service_url}/status/{user_id}/{order_id}")
+#     else:
+#         response = requests.get(f"{gateway_url}/payment/status/{user_id}/{order_id}")
+#     return response.text
+
+
 @app.post("/create/<user_id>")
 def create_order(user_id):
     order_id = str(uuid.uuid4())
@@ -152,7 +148,7 @@ def remove_order(order_id):
 
 @app.post("/addItem/<order_id>/<item_id>")
 def fire_add_item_saga(order_id, item_id):
-    req = {order_id: item_id}
+    req = {"order_id": order_id, "item_id": item_id}
     s = saga.Saga(dtm, utils.gen_gid(dtm))
     s.add(
         req,
@@ -160,10 +156,10 @@ def fire_add_item_saga(order_id, item_id):
         order_service_url + "addItemCompensate/" + order_id + "/" + item_id,
     )
     s.submit()
-    return jsonify({"status": "success"}, {"gid", s.trans_base.gid}), 200
+    return jsonify({"status": "success"}, {"gid": s.trans_base.gid}), 200
 
 
-def add_item_saga(order_id, item_id):
+def add_item_saga(db, order_id, item_id):
     order_key = f"order:{order_id}"
 
     pipe = db.pipeline(transaction=True)
@@ -198,16 +194,15 @@ def add_item_saga(order_id, item_id):
 
 @app.post("/addItemSaga/<order_id>/<item_id>")
 def add_item_saga_api(order_id, item_id):
-    with barrier.AutoCursor(conn_new()) as cursor:
+    def busi_callback(db):
+        response = add_item_saga(db, order_id, item_id)
+        return response
 
-        def busi_callback():
-            add_item_saga(order_id, item_id)
-
-        barrier_from_req(request).call(cursor, busi_callback)
-    return {"dtm_result": "SUCCESS"}
+    text, code = barrier_from_req(request).redis_call(db, busi_callback)
+    return text, code
 
 
-def add_item_compensate(order_id, item_id):
+def add_item_compensate(db, order_id, item_id):
     order_key = f"order:{order_id}"
 
     pipe = db.pipeline(transaction=True)
@@ -242,13 +237,12 @@ def add_item_compensate(order_id, item_id):
 
 @app.post("/addItemCompensate/<order_id>/<item_id>")
 def add_item_compensate_api(order_id, item_id):
-    with barrier.AutoCursor(conn_new()) as cursor:
+    def busi_callback(db):
+        response = add_item_compensate(db, order_id, item_id)
+        return response
 
-        def busi_callback():
-            add_item_compensate(order_id, item_id)
-
-        barrier_from_req(request).call(cursor, busi_callback)
-    return {"dtm_result": "SUCCESS"}
+    text, code = barrier_from_req(request).redis_call(db, busi_callback)
+    return text, code
 
 
 @app.delete("/removeItem/<order_id>/<item_id>")
@@ -307,98 +301,7 @@ def find_order(order_id):
         pipe.unwatch()
 
 
-# @app.post("/checkout_saga/<order_id>")
-# def checkout_saga(order_id):
-#     order_key = f"order:{order_id}"
-#     pipe = db.pipeline(transaction=True)
-#     try:
-#         pipe.watch(order_key)
-#         pipe.multi()
-#         pipe.hgetall(order_key)
-#         result = pipe.execute()
-#         order_data = result[0]
-#         if not order_data:
-#             return jsonify({"error": "Order not found"}), 400
-#         user_id = order_data[b"user_id"].decode()
-#         total_cost = int(order_data[b"total_cost"])
-#         payment_response = process_payment(user_id, order_id, total_cost)
-
-#         if payment_response.status_code == 200:
-#             items = json.loads(order_data[b"items"].decode())
-#             revert_order_items = []
-#             for item_id in items:
-#                 # ************ pay special attetion here, may need changes later ************
-#                 # this place has bug, if one item is not enough, the whole order will be canceled
-#                 if not subtract_stock_quantity(item_id, 1):
-#                     cancel_response = cancel_payment(user_id, order_id)
-#                     if cancel_response == True:
-#                         for item_id in revert_order_items:
-#                             add_stock_quantity(item_id, 1)
-#                         return jsonify({"error": "Not enough stock"}), 400
-#                 revert_order_items.append(item_id)
-#             pipe.multi()
-#             # pipe.hset(order_key, "items", json.dumps(items))
-#             pipe.hset(order_key, "paid", "True")
-#             pipe.execute()
-#             return jsonify({"status": "success"}), 200
-#         else:
-#             return (
-#                 jsonify({"error": payment_response.text}),
-#                 payment_response.status_code,
-#             )
-#     except Exception as e:
-#         return str(e), 500
-#     finally:
-#         pipe.unwatch()
-
-
-# @app.post("/checkout_compensate/<order_id>")
-# def checkout_compoensate(order_id):
-#     order_key = f"order:{order_id}"
-#     pipe = db.pipeline(transaction=True)
-#     try:
-#         pipe.watch(order_key)
-#         pipe.multi()
-#         pipe.hgetall(order_key)
-#         result = pipe.execute()
-#         order_data = result[0]
-#         if not order_data:
-#             return jsonify({"error": "Order not found"}), 400
-#         user_id = order_data[b"user_id"].decode()
-#         total_cost = int(order_data[b"total_cost"])
-#         payment_response = process_payment(user_id, order_id, total_cost)
-
-#         if payment_response.status_code == 200:
-#             items = json.loads(order_data[b"items"].decode())
-#             revert_order_items = []
-#             for item_id in items:
-#                 # ************ pay special attetion here, may need changes later ************
-#                 # this place has bug, if one item is not enough, the whole order will be canceled
-#                 if not subtract_stock_quantity(item_id, 1):
-#                     cancel_response = cancel_payment(user_id, order_id)
-#                     if cancel_response == True:
-#                         for item_id in revert_order_items:
-#                             add_stock_quantity(item_id, 1)
-#                         return jsonify({"error": "Not enough stock"}), 400
-#                 revert_order_items.append(item_id)
-#             pipe.multi()
-#             # pipe.hset(order_key, "items", json.dumps(items))
-#             pipe.hset(order_key, "paid", "True")
-#             pipe.execute()
-#             return jsonify({"status": "success"}), 200
-#         else:
-#             return (
-#                 jsonify({"error": payment_response.text}),
-#                 payment_response.status_code,
-#             )
-#     except Exception as e:
-#         return str(e), 500
-#     finally:
-#         pipe.unwatch()
-
-
-@app.post("/checkout/<order_id>")
-def checkout(order_id):
+def checkout_saga(db, order_id):
     order_key = f"order:{order_id}"
     pipe = db.pipeline(transaction=True)
     try:
@@ -409,34 +312,117 @@ def checkout(order_id):
         order_data = result[0]
         if not order_data:
             return jsonify({"error": "Order not found"}), 400
+
+        # if we have order_data:
         user_id = order_data[b"user_id"].decode()
         total_cost = int(order_data[b"total_cost"])
-        payment_response = process_payment(user_id, order_id, total_cost)
 
+        # Start of stock check
+        items = json.loads(order_data[b"items"].decode())
+        revert_order_items = []
+        for item_id in items:
+            if not subtract_stock_quantity(
+                item_id, 1
+            ):  # Check if there's enough stock for each item
+                for item_id in revert_order_items:
+                    add_stock_quantity(
+                        item_id, 1
+                    )  # Revert the stock changes if there's not enough stock for any item
+                return jsonify({"error": "Not enough stock"}), 400
+            revert_order_items.append(item_id)
+        # End of stock check
+
+        # Start of payment processing
+        payment_response = process_payment(
+            user_id, order_id, total_cost
+        )  # Process the payment
         if payment_response.status_code == 200:
-            items = json.loads(order_data[b"items"].decode())
-            revert_order_items = []
-            for item_id in items:
-                # ************ pay special attetion here, may need changes later ************
-                # this place has bug, if one item is not enough, the whole order will be canceled
-                if not subtract_stock_quantity(item_id, 1):
-                    cancel_response = cancel_payment(user_id, order_id)
-                    if cancel_response == True:
-                        for item_id in revert_order_items:
-                            add_stock_quantity(item_id, 1)
-                        return jsonify({"error": "Not enough stock"}), 400
-                revert_order_items.append(item_id)
             pipe.multi()
-            # pipe.hset(order_key, "items", json.dumps(items))
             pipe.hset(order_key, "paid", "True")
             pipe.execute()
             return jsonify({"status": "success"}), 200
         else:
+            for item_id in revert_order_items:
+                add_stock_quantity(
+                    item_id, 1
+                )  # Revert the stock changes if the payment fails
             return (
                 jsonify({"error": payment_response.text}),
                 payment_response.status_code,
             )
+        # End of payment processing
     except Exception as e:
         return str(e), 500
     finally:
         pipe.unwatch()
+
+
+@app.post("/checkoutSaga/<order_id>")
+def checkout_saga_api(order_id):
+    def busi_callback(db):
+        response = checkout_saga(db, order_id)
+        return response
+
+    text, code = barrier_from_req(request).redis_call(db, busi_callback)
+    return text, code
+
+
+def checkout_compensate(db, order_id):
+    order_key = f"order:{order_id}"
+    pipe = db.pipeline(transaction=True)
+    try:
+        pipe.watch(order_key)
+        pipe.multi()
+        pipe.hgetall(order_key)
+        result = pipe.execute()
+        order_data = result[0]
+        if not order_data:
+            return jsonify({"error": "Order not found"}), 400
+
+        # if we have order_data:
+        user_id = order_data[b"user_id"].decode()
+
+        # we dont need to check stock here, because we are compensating
+        items = json.loads(order_data[b"items"].decode())
+        for item_id in items:
+            if not add_stock_quantity(item_id, 1):  # Add back the quantity
+                return jsonify({"error": "Failed to add back stock"}), 500
+
+        # Compensate payment
+        payment_status = order_data[b"paid"].decode()
+        if payment_status:
+            payment_response = cancel_payment(user_id, order_id)
+            if payment_response != 200:
+                return (
+                    jsonify({"error": "Failed to cancel payment"}),
+                    payment_response,
+                )
+        return jsonify({"status": "success"}), 200
+
+    except Exception as e:
+        return str(e), 500
+    finally:
+        pipe.unwatch()
+
+
+@app.post("/checkoutCompensate/<order_id>")
+def checkout_compensate_api(order_id):
+    def busi_callback(db):
+        response = checkout_compensate(db, order_id)
+        return response
+
+    text, code = barrier_from_req(request).redis_call(db, busi_callback)
+    return text, code
+
+
+@app.post("/checkout/<order_id>")
+def fire_checkout_saga(order_id):
+    req = {"order_id": order_id}
+    s = saga.Saga(dtm, utils.gen_gid(dtm))
+    s.add(
+        req,
+        order_service_url + "checkoutSaga/" + order_id,
+        order_service_url + "checkoutCompensate/" + order_id,
+    )
+    s.submit()
+    return jsonify({"status": "success"}, {"gid": s.trans_base.gid}), 200
