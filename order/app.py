@@ -146,7 +146,8 @@ def remove_order(order_id):
         pipe.reset()
 
 
-@app.post("/addItem/<order_id>/<item_id>")
+# no saga for this one
+# @app.post("/addItem/<order_id>/<item_id>")
 def fire_add_item_saga(order_id, item_id):
     req = {"order_id": order_id, "item_id": item_id}
     s = saga.Saga(dtm, utils.gen_gid(dtm))
@@ -159,7 +160,8 @@ def fire_add_item_saga(order_id, item_id):
     return jsonify({"status": "success"}, {"gid": s.trans_base.gid}), 200
 
 
-def add_item_saga(db, order_id, item_id):
+@app.post("/addItem/<order_id>/<item_id>")
+def add_item_saga(order_id, item_id):
     order_key = f"order:{order_id}"
 
     pipe = db.pipeline(transaction=True)

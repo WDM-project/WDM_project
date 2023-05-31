@@ -96,27 +96,24 @@ class BranchBarrier(object):
                 "compensate": "action",
             }.get(self.op, "")
             origin_affected = redis_query_barrier(
-                db,
-                self.gid,
-                self.branch_id,
-                orgin_branch,
-                bid,
+                db, self.gid, self.branch_id, orgin_branch, bid
             )
             pipe.hset(
-                f"{self.gid}-{self.branch_id}-{orgin_branch}-{bid}",
-                self.op,
+                f"{self.gid}-{self.branch_id}-{orgin_branch}-{bid}", "op", self.op
+            )
+            pipe.hset(
+                f"saga:{self.gid}-{self.branch_id}-{orgin_branch}-{bid}",
+                "trans_type",
                 self.trans_type,
             )
+
             current_affected = redis_query_barrier(
-                db,
-                self.gid,
-                self.branch_id,
-                self.op,
-                bid,
+                db, self.gid, self.branch_id, self.op, bid
             )
+            pipe.hset(f"{self.gid}-{self.branch_id}-{self.op}-{bid}", "op", self.op)
             pipe.hset(
-                f"{self.gid}-{self.branch_id}-{self.op}-{bid}",
-                self.op,
+                f"saga:{self.gid}-{self.branch_id}-{self.op}-{bid}",
+                "trans_type",
                 self.trans_type,
             )
             print(
@@ -189,7 +186,8 @@ def redis_query_barrier(rd: redis.Redis, gid, branch_id, op, barrier_id):
     if op == "":
         return 0
     bkey = f"{gid}-{branch_id}-{op}-{barrier_id}"
-    if rd.exists(bkey):
-        return 0
-    else:
-        return 1
+    if rd.hexists(bkey, "op"):
+        current_value = rd.hget(bkey, "op")
+        if current_value is not None and current_value.decode("utf-8") == op:
+            return 0
+    return 1
