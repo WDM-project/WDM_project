@@ -132,7 +132,7 @@ class BranchBarrier(object):
                 or current_affected == 0
             ):
                 pipe.execute()
-                return "empty compensation or hanging", 202
+                return "empty compensation or hanging", 200
             text, code = busi_callback(db)
             pipe.execute()
             return text, code

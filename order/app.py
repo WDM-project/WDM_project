@@ -138,7 +138,7 @@ def remove_order(order_id):
         pipe.delete(f"order:{order_id}")
         result = pipe.execute()
         if result[0] == 0:
-            return jsonify({"error": "Order not found"}), 400
+            return jsonify({"error": "Order not found"}), 409
         return jsonify({"status": "success"}), 200
     except Exception as e:
         return str(e), 500
@@ -146,18 +146,18 @@ def remove_order(order_id):
         pipe.reset()
 
 
-# no saga for this one
-# @app.post("/addItem/<order_id>/<item_id>")
-def fire_add_item_saga(order_id, item_id):
-    req = {"order_id": order_id, "item_id": item_id}
-    s = saga.Saga(dtm, utils.gen_gid(dtm))
-    s.add(
-        req,
-        order_service_url + "addItemSaga/" + order_id + "/" + item_id,
-        order_service_url + "addItemCompensate/" + order_id + "/" + item_id,
-    )
-    s.submit()
-    return jsonify({"status": "success"}, {"gid": s.trans_base.gid}), 200
+# # no saga for this one
+# # @app.post("/addItem/<order_id>/<item_id>")
+# def fire_add_item_saga(order_id, item_id):
+#     req = {"order_id": order_id, "item_id": item_id}
+#     s = saga.Saga(dtm, utils.gen_gid(dtm))
+#     s.add(
+#         req,
+#         order_service_url + "addItemSaga/" + order_id + "/" + item_id,
+#         order_service_url + "addItemCompensate/" + order_id + "/" + item_id,
+#     )
+#     s.submit()
+#     return jsonify({"status": "success"}, {"gid": s.trans_base.gid}), 200
 
 
 @app.post("/addItem/<order_id>/<item_id>")
@@ -173,13 +173,13 @@ def add_item_saga(order_id, item_id):
         result = pipe.execute()
         # app.logger.debug(f"Pipeline result: {result}")
         if not result:
-            return jsonify({"error": "Result Error In Pipe Execution"}), 400
+            return jsonify({"error": "Result Error In Pipe Execution"}), 409
         if not result[0]:
-            return jsonify({"error": "The order_key does not exist"}), 400
+            return jsonify({"error": "The order_key does not exist"}), 409
         order_data = result[1]
         item_price = get_item_price(item_id)
         if item_price is None:
-            return jsonify({"error": "Item not found"}), 400
+            return jsonify({"error": "Item not found"}), 409
         items = json.loads(order_data[b"items"].decode())
         items.append(item_id)
         total_cost = int(order_data[b"total_cost"]) + item_price
@@ -194,14 +194,14 @@ def add_item_saga(order_id, item_id):
         pipe.unwatch()
 
 
-@app.post("/addItemSaga/<order_id>/<item_id>")
-def add_item_saga_api(order_id, item_id):
-    def busi_callback(db):
-        response = add_item_saga(db, order_id, item_id)
-        return response
+# @app.post("/addItemSaga/<order_id>/<item_id>")
+# def add_item_saga_api(order_id, item_id):
+#     def busi_callback(db):
+#         response = add_item_saga(db, order_id, item_id)
+#         return response
 
-    text, code = barrier_from_req(request).redis_call(db, busi_callback)
-    return text, code
+#     text, code = barrier_from_req(request).redis_call(db, busi_callback)
+#     return text, code
 
 
 def add_item_compensate(db, order_id, item_id):
@@ -216,13 +216,13 @@ def add_item_compensate(db, order_id, item_id):
         result = pipe.execute()
         # app.logger.debug(f"Pipeline result: {result}")
         if not result:
-            return jsonify({"error": "Result Error In Pipe Execution"}), 400
+            return jsonify({"error": "Result Error In Pipe Execution"}), 409
         if not result[0]:
-            return jsonify({"error": "The order_key does not exist"}), 400
+            return jsonify({"error": "The order_key does not exist"}), 409
         order_data = result[1]
         item_price = get_item_price(item_id)
         if item_price is None:
-            return jsonify({"error": "Item not found"}), 400
+            return jsonify({"error": "Item not found"}), 409
         items = json.loads(order_data[b"items"].decode())
         items.remove(item_id)
         total_cost = int(order_data[b"total_cost"]) - item_price
@@ -237,14 +237,14 @@ def add_item_compensate(db, order_id, item_id):
         pipe.unwatch()
 
 
-@app.post("/addItemCompensate/<order_id>/<item_id>")
-def add_item_compensate_api(order_id, item_id):
-    def busi_callback(db):
-        response = add_item_compensate(db, order_id, item_id)
-        return response
+# @app.post("/addItemCompensate/<order_id>/<item_id>")
+# def add_item_compensate_api(order_id, item_id):
+#     def busi_callback(db):
+#         response = add_item_compensate(db, order_id, item_id)
+#         return response
 
-    text, code = barrier_from_req(request).redis_call(db, busi_callback)
-    return text, code
+#     text, code = barrier_from_req(request).redis_call(db, busi_callback)
+#     return text, code
 
 
 @app.delete("/removeItem/<order_id>/<item_id>")
@@ -258,13 +258,13 @@ def remove_item(order_id, item_id):
         result = pipe.execute()
         order_data = result[0]
         if not order_data:
-            return jsonify({"error": "Order not found"}), 400
+            return jsonify({"error": "Order not found"}), 409
         item_price = get_item_price(item_id)
         if item_price is None:
-            return jsonify({"error": "Item not found"}), 400
+            return jsonify({"error": "Item not found"}), 409
         items = json.loads(order_data[b"items"].decode())
         if item_id not in items:
-            return jsonify({"error": "Item not in order"}), 400
+            return jsonify({"error": "Item not in order"}), 409
         items.remove(item_id)
         total_cost = int(order_data[b"total_cost"]) - item_price
         pipe.multi()
@@ -289,7 +289,7 @@ def find_order(order_id):
         result = pipe.execute()
         order_data = result[0]
         if not order_data:
-            return jsonify({"error": "Order not found"}), 400
+            return jsonify({"error": "Order not found"}), 409
         order = {
             key.decode(): (
                 value.decode() if key != b"items" else json.loads(value.decode())
@@ -313,7 +313,7 @@ def checkout_saga(db, order_id):
         result = pipe.execute()
         order_data = result[0]
         if not order_data:
-            return jsonify({"error": "Order not found"}), 400
+            return jsonify({"error": "Order not found"}), 409
 
         # if we have order_data:
         user_id = order_data[b"user_id"].decode()
@@ -330,7 +330,7 @@ def checkout_saga(db, order_id):
                     add_stock_quantity(
                         item_id, 1
                     )  # Revert the stock changes if there's not enough stock for any item
-                return jsonify({"error": "Not enough stock"}), 400
+                return jsonify({"error": "Not enough stock"}), 409
             revert_order_items.append(item_id)
         # End of stock check
 
@@ -379,7 +379,7 @@ def checkout_compensate(db, order_id):
         result = pipe.execute()
         order_data = result[0]
         if not order_data:
-            return jsonify({"error": "Order not found"}), 400
+            return jsonify({"error": "Order not found"}), 409
 
         # if we have order_data:
         user_id = order_data[b"user_id"].decode()
@@ -420,11 +420,11 @@ def checkout_compensate_api(order_id):
 @app.post("/checkout/<order_id>")
 def fire_checkout_saga(order_id):
     req = {"order_id": order_id}
-    s = saga.Saga(dtm, utils.gen_gid(dtm))
+    s = saga.Saga(dtm, order_id)
     s.add(
         req,
         order_service_url + "checkoutSaga/" + order_id,
         order_service_url + "checkoutCompensate/" + order_id,
     )
-    s.submit()
-    return jsonify({"status": "success"}, {"gid": s.trans_base.gid}), 200
+    response = s.submit()
+    return json.dumps(response)

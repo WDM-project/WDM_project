@@ -36,10 +36,10 @@ class Saga(object):
 
     def submit(self):
         self.build_custom_options()
-        dtmimp.trans_call_dtm(
+        r = dtmimp.trans_call_dtm(
             self.dtm,
             self.trans_base.__dict__,
             "submit",
             self.trans_base.request_timeout,
         )
-        
+        return r
