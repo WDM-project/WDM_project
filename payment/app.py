@@ -63,7 +63,7 @@ def find_user(user_id: str):
 
 
 @app.post("/add_funds/<user_id>/<amount>")
-def add_credit(user_id: str, amount: float):
+def add_credit(user_id: str, amount: int):
     pipe = db.pipeline(transaction=True)
     user_key = f"user:{user_id}"
     try:
@@ -72,7 +72,7 @@ def add_credit(user_id: str, amount: float):
         if not exists:
             return jsonify({"error": "User not found"}), 400
         pipe.multi()
-        pipe.hincrbyfloat(user_key, "credit", amount)
+        pipe.hincrby(user_key, "credit", int(amount))
         pipe.execute()
         return jsonify({"done": True}), 200
     except Exception as e:
