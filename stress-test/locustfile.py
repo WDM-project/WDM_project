@@ -45,7 +45,7 @@ def create_user(session):
 
 def add_balance_to_user(session):
     balance_to_add: float = random.uniform(10000.0, 100000.0)
-    session.client.post(f"{PAYMENT_URL}/payment/add_funds/{session.user_id}/{balance_to_add}",
+    session.client.post(f"{PAYMENT_URL}/payment/add_funds/{session.user_id}/{int(balance_to_add)}",
                         name="/payment/add_funds/[user_id]/[amount]")
 
 
