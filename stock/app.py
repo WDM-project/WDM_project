@@ -6,49 +6,7 @@ from kafka import KafkaProducer
 import json
 from kafka import KafkaConsumer
 from threading import Thread
-
-producer = KafkaProducer(
-    bootstrap_servers="kafka:9092",
-    value_serializer=lambda v: json.dumps(v).encode("utf-8"),
-)
-
-# Initialize Kafka consumer
-consumer = KafkaConsumer(
-    "stock_topic",
-    bootstrap_servers=["kafka:9092"],
-    value_deserializer=lambda x: json.loads(x.decode("utf-8")),
-)
-
-
-# The function to process messages
-def process_messages():
-    for message in consumer:
-        order_data = message.value
-        order_id = order_data["order_id"]
-        items = order_data["items"]
-
-        for item in items:
-            # Call the /subtract/ endpoint with the required parameters
-            response = requests.post(
-                f"http://localhost:5000/subtract/{item['item_id']}/{item['quantity']}"
-            )
-
-            if response.json()["done"]:
-                # If stock subtraction successful, send success message to Order Consumer Service
-                producer.send(
-                    "order_topic", {"order_id": order_id, "stock_status": "success"}
-                )
-            else:
-                # If stock subtraction failed, send failure message to Order Consumer Service
-                producer.send(
-                    "order_topic", {"order_id": order_id, "stock_status": "failure"}
-                )
-                break
-
-
-# Start a new thread to process messages
-Thread(target=process_messages).start()
-
+import requests
 
 app = Flask("stock-service")
 

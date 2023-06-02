@@ -8,7 +8,7 @@ import json
 from kafka import KafkaProducer
 from kafka import KafkaConsumer
 from threading import Thread
-
+import asyncio
 
 app = Flask("order-service")
 
@@ -220,9 +220,17 @@ def find_order(order_id):
 
 @app.post("/checkout/<order_id>")
 def checkout(order_id):
+    global_transaction_id = str(uuid.uuid4())
     order_key = f"order:{order_id}"
+    global_transaction_key = f"global_transaction_id:{global_transaction_id}"
     pipe = db.pipeline(transaction=True)
+
     try:
+        # set up global transaction id
+        pipe.multi()
+        pipe.hset(global_transaction_key, "status", "pending")
+        pipe.hset(global_transaction_key, "order_id", order_id)
+        pipe.execute()
         pipe.watch(order_key)
         pipe.multi()
         pipe.hgetall(order_key)
@@ -238,71 +246,82 @@ def checkout(order_id):
         # Start of stock check
         items = json.loads(order_data[b"items"].decode())
 
-        # Prepare Kafka Producer
         producer = KafkaProducer(
-            bootstrap_servers=["kafka:9092"],
-            value_serializer=lambda v: json.dumps(v).encode("ascii"),
-            key_serializer=lambda v: json.dumps(v).encode("ascii"),
+            bootstrap_servers="kafka:9092",
+            value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+            key_serializer=lambda v: json.dumps(v).encode("utf-8"),
         )
-
-        # Generate a transaction number
-        tran_id = uuid.uuid4().hex
-        # Send the order details to Kafka for processing
+        # Start of stock check and payment processing.
+        # Send a message to Kafka instead of calling the microservices directly.
         producer.send(
-            "checkout-topic",
-            key={"order_id": order_id
-            },
-            tran_id": tran_id, 
-            value=items,
+            "stock_check_topic",
+            value={"order_data": order_data},
+            key=global_transaction_id,
         )
-        databaset.setkey(orderid, tran_id,tran_status)
-        # Send a message to the Stock Service for each item
-        for item in items:
-            producer.send(
-                "stock_topic",
-                tran_id,
-                key=order_id,
-                value={"item_id": item, "quantity": items[item]},
-            )
-
-        # Send a message to the Payment Service
         producer.send(
-            "payment_topic",
-            key=order_id,
-            value={"user_id": user_id, "total_cost": total_cost},
+            "payment_processing_topic",
+            value={"order_data": order_data},
+            key=global_transaction_id,
         )
 
-        # Prepare Kafka Consumer to receive the response messages
         consumer = KafkaConsumer(
-            "order_topic",
-            bootstrap_servers=["kafka:9092"],
-            value_deserializer=lambda x: json.loads(x.decode("ascii")),
-            key_deserializer=lambda x: json.loads(x.decode("ascii")),
+            bootstrap_servers="kafka:9092",
             auto_offset_reset="latest",
+            value_deserializer=lambda x: json.loads(x.decode("utf-8")),
+            key_deserializer=lambda x: json.loads(x.decode("utf-8")),
         )
+        # response_statuses = {}
+        # consumer.subscribe(
+        #     ["stock_check_result_topic", "payment_processing_result_topic"]
+        # )
+        # while len(response_statuses) < 2:
+        #     for message in consumer:
+        #         msg = json.loads(message.value)
+        #         if msg["transaction_id"] == global_transaction_id:
+        #             response_statuses[message.topic] = msg["status"]
 
-        # Process the response messages
+        consumer.subscribe(["order_result_topic"])
         for message in consumer:
-            if message.key != order_id:
-                continue
+            msg = json.loads(message.value)
+            if msg["transaction_id"] == global_transaction_id:
+                if msg["status"] == "success":
+                    return jsonify({"status": "success"}), 200
+                else:
+                    return jsonify({"error": "Payment failed"}), 400
 
-            if message.value["stock_status"] == "failure":
-                return {
-                    "fail": f"Unable to check-out order {order_id}: not enough stock"
-                }, 400
 
-            if message.value["payment_status"] == "failure":
-                return {
-                    "fail": f"Unable to check-out order {order_id}: not enough credit"
-                }, 400
+        # the below is for serial processing
+        # revert_order_items = []
+        # for item_id in items:
+        #     if not subtract_stock_quantity(
+        #         item_id, 1
+        #     ):  # Check if there's enough stock for each item
+        #         for item_id in revert_order_items:
+        #             add_stock_quantity(
+        #                 item_id, 1
+        #             )  # Revert the stock changes if there's not enough stock for any item
+        #         return jsonify({"error": "Not enough stock"}), 400
+        #     revert_order_items.append(item_id)
+        # # End of stock check
 
-            if (
-                message.value["stock_status"] == "success"
-                and message.value["payment_status"] == "success"
-            ):
-                db.hset(order_key, "paid", "True")
-                return jsonify({"status": "success"}), 200
-
+        # # Start of payment processing
+        # payment_response = process_payment(
+        #     user_id, order_id, total_cost
+        # )  # Process the payment
+        # if payment_response.status_code == 200:
+        #     pipe.multi()
+        #     pipe.hset(order_key, "paid", "True")
+        #     pipe.execute()
+        #     return jsonify({"status": "success"}), 200
+        # else:
+        #     for item_id in revert_order_items:
+        #         add_stock_quantity(
+        #             item_id, 1
+        #         )  # Revert the stock changes if the payment fails
+        #     return (
+        #         jsonify({"error": payment_response.text}),
+        #         payment_response.status_code,
+        #     )
         # End of payment processing
     except Exception as e:
         return str(e), 500
