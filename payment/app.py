@@ -2,6 +2,50 @@ import os
 import atexit
 from flask import Flask, jsonify
 import redis
+from kafka import KafkaProducer
+import json
+from kafka import KafkaConsumer
+from threading import Thread
+
+producer = KafkaProducer(
+    bootstrap_servers="kafka:9092",
+    value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+)
+
+# Initialize Kafka consumer
+consumer = KafkaConsumer(
+    "payment_topic",
+    bootstrap_servers=["kafka:9092"],
+    value_deserializer=lambda x: json.loads(x.decode("utf-8")),
+)
+
+
+# The function to process messages
+def process_messages():
+    for message in consumer:
+        order_data = message.value
+        user_id = order_data["user_id"]
+        order_id = order_data["order_id"]
+        amount = order_data["total_cost"]
+
+        # Call the /pay/ endpoint with the required parameters
+        js,code = remove_credit(user_id, order_id, amount)
+
+        if code == 200:
+            # If payment successful, send success message to Order Consumer Service
+            producer.send(
+                "order_topic", {"order_id": order_id, "payment_status": "success"}
+            )
+        else:
+            # If payment failed, send failure message to Order Consumer Service
+            producer.send(
+                "order_topic", {"order_id": order_id, "payment_status": "failure"}
+            )
+
+
+# Start a new thread to process messages
+Thread(target=process_messages).start()
+
 
 app = Flask("payment-service")
 

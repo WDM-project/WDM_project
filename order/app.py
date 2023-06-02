@@ -5,6 +5,10 @@ import requests
 from flask import Flask, jsonify
 import redis
 import json
+from kafka import KafkaProducer
+from kafka import KafkaConsumer
+from threading import Thread
+
 
 app = Flask("order-service")
 
@@ -213,6 +217,7 @@ def find_order(order_id):
     finally:
         pipe.unwatch()
 
+
 @app.post("/checkout/<order_id>")
 def checkout(order_id):
     order_key = f"order:{order_id}"
@@ -225,84 +230,81 @@ def checkout(order_id):
         order_data = result[0]
         if not order_data:
             return jsonify({"error": "Order not found"}), 400
-        
+
         # if we have order_data:
         user_id = order_data[b"user_id"].decode()
         total_cost = int(order_data[b"total_cost"])
 
         # Start of stock check
         items = json.loads(order_data[b"items"].decode())
-        revert_order_items = []
-        for item_id in items:
-            if not subtract_stock_quantity(item_id, 1):  # Check if there's enough stock for each item
-                for item_id in revert_order_items:
-                    add_stock_quantity(item_id, 1)  # Revert the stock changes if there's not enough stock for any item
-                return jsonify({"error": "Not enough stock"}), 400
-            revert_order_items.append(item_id)
-        # End of stock check
 
-        # Start of payment processing
-        payment_response = process_payment(user_id, order_id, total_cost)  # Process the payment
-        if payment_response.status_code == 200:
-            pipe.multi()
-            pipe.hset(order_key, "paid", "True")
-            pipe.execute()
-            return jsonify({"status": "success"}), 200
-        else:
-            for item_id in revert_order_items:
-                add_stock_quantity(item_id, 1)  # Revert the stock changes if the payment fails
-            return (
-                jsonify({"error": payment_response.text}),
-                payment_response.status_code,
+        # Prepare Kafka Producer
+        producer = KafkaProducer(
+            bootstrap_servers=["kafka:9092"],
+            value_serializer=lambda v: json.dumps(v).encode("ascii"),
+            key_serializer=lambda v: json.dumps(v).encode("ascii"),
+        )
+
+        # Generate a transaction number
+        tran_id = uuid.uuid4().hex
+        # Send the order details to Kafka for processing
+        producer.send(
+            "checkout-topic",
+            key={"order_id": order_id
+            },
+            tran_id": tran_id, 
+            value=items,
+        )
+        databaset.setkey(orderid, tran_id,tran_status)
+        # Send a message to the Stock Service for each item
+        for item in items:
+            producer.send(
+                "stock_topic",
+                tran_id,
+                key=order_id,
+                value={"item_id": item, "quantity": items[item]},
             )
+
+        # Send a message to the Payment Service
+        producer.send(
+            "payment_topic",
+            key=order_id,
+            value={"user_id": user_id, "total_cost": total_cost},
+        )
+
+        # Prepare Kafka Consumer to receive the response messages
+        consumer = KafkaConsumer(
+            "order_topic",
+            bootstrap_servers=["kafka:9092"],
+            value_deserializer=lambda x: json.loads(x.decode("ascii")),
+            key_deserializer=lambda x: json.loads(x.decode("ascii")),
+            auto_offset_reset="latest",
+        )
+
+        # Process the response messages
+        for message in consumer:
+            if message.key != order_id:
+                continue
+
+            if message.value["stock_status"] == "failure":
+                return {
+                    "fail": f"Unable to check-out order {order_id}: not enough stock"
+                }, 400
+
+            if message.value["payment_status"] == "failure":
+                return {
+                    "fail": f"Unable to check-out order {order_id}: not enough credit"
+                }, 400
+
+            if (
+                message.value["stock_status"] == "success"
+                and message.value["payment_status"] == "success"
+            ):
+                db.hset(order_key, "paid", "True")
+                return jsonify({"status": "success"}), 200
+
         # End of payment processing
     except Exception as e:
         return str(e), 500
     finally:
         pipe.unwatch()
-
-
-# this would fail
-# @app.post("/checkout/<order_id>")
-# def checkout(order_id):
-#     order_key = f"order:{order_id}"
-#     pipe = db.pipeline(transaction=True)
-#     try:
-#         pipe.watch(order_key)
-#         pipe.multi()
-#         pipe.hgetall(order_key)
-#         result = pipe.execute()
-#         order_data = result[0]
-#         if not order_data:
-#             return jsonify({"error": "Order not found"}), 400
-#         user_id = order_data[b"user_id"].decode()
-#         total_cost = int(order_data[b"total_cost"])
-#         payment_response = process_payment(user_id, order_id, total_cost)
-
-#         if payment_response.status_code == 200:
-#             items = json.loads(order_data[b"items"].decode())
-#             revert_order_items = []
-#             for item_id in items:
-#                 # ************ pay special attetion here, may need changes later ************
-#                 # this place has bug, if one item is not enough, the whole order will be canceled
-#                 if not subtract_stock_quantity(item_id, 1):
-#                     cancel_response = cancel_payment(user_id, order_id)
-#                     if cancel_response == True:
-#                         for item_id in revert_order_items:
-#                             add_stock_quantity(item_id, 1)
-#                         return jsonify({"error": "Not enough stock"}), 400
-#                 revert_order_items.append(item_id)
-#             pipe.multi()
-#             # pipe.hset(order_key, "items", json.dumps(items))
-#             pipe.hset(order_key, "paid", "True")
-#             pipe.execute()
-#             return jsonify({"status": "success"}), 200
-#         else:
-#             return (
-#                 jsonify({"error": payment_response.text}),
-#                 payment_response.status_code,
-#             )
-#     except Exception as e:
-#         return str(e), 500
-#     finally:
-#         pipe.unwatch()
