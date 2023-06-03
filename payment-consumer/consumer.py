@@ -41,7 +41,13 @@ def remove_credit(user_id: str, order_id: str, amount: int):
         result = pipe.execute()
         current_credit = result[0]
         current_credit = int(current_credit)
-        print("current credit", current_credit, "orderid", order_id, "amount")
+        print(
+            "current credit",
+            current_credit,
+            "orderid",
+            order_id,
+            "in line 44 of payment consumer",
+        )
         if current_credit < int(amount):
             return {"error": "Insufficient credit"}, 400
 

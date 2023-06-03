@@ -29,11 +29,13 @@ consumer = KafkaConsumer(
 
 
 def modify_stock_list(items: list, amount: int):
+    print("in modify stock list function line 32", items, amount)
     pipe = db.pipeline(transaction=True)
     # First phase: check all items
     for item_id in items:
         item_key = f"item:{item_id}"
         stock = db.hget(item_key, "stock")
+        print("stock variable in modify stock list function line 38", stock)
         if stock is None:
             return (
                 {"error": "Item not found: "},
