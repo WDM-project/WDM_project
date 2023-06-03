@@ -42,21 +42,27 @@ services:
   payment-consumer-service:
     build: ./payment-consumer
     image: payment-consumer:latest
-    command: python consumer.py
+    depends_on:
+      - kafka
+    command: ["./wait-for-kafka.sh", "python", "consumer.py"]
     env_file:
       - env/payment_redis.env
 
   order-consumer-service:
     build: ./order-consumer
     image: order-consumer:latest
-    command: python consumer.py
+    depends_on:
+      - kafka
+    command: ["./wait-for-kafka.sh", "python", "consumer.py"]
     env_file:
       - env/order_redis.env
 
   stock-consumer-service:
     build: ./stock-consumer
     image: stock-consumer:latest
-    command: python consumer.py
+    depends_on:
+      - kafka
+    command: ["./wait-for-kafka.sh", "python", "consumer.py"]
     env_file:
       - env/stock_redis.env
 
