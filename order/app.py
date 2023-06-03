@@ -240,17 +240,18 @@ def checkout(order_id):
         pipe.multi()
         pipe.hgetall(order_key)
         result = pipe.execute()
-        order_data = result[0]
+        # order_data = result[0]
+        order_data = byte_keys_to_str(result[0])
         if not order_data:
             return jsonify({"error": "Order not found"}), 400
 
         # if we have order_data:
-        user_id = order_data[b"user_id"].decode()
-        total_cost = int(order_data[b"total_cost"])
+        # user_id = order_data[b"user_id"].decode()
+        # total_cost = int(order_data[b"total_cost"])
 
         # Start of stock check
-        items = json.loads(order_data[b"items"].decode())
-
+        # items = json.loads(order_data[b"items"].decode())
+        items = order_data["items"]
         producer = KafkaProducer(
             bootstrap_servers="kafka:9092",
             value_serializer=lambda v: json.dumps(v).encode("utf-8"),
@@ -340,3 +341,10 @@ def checkout(order_id):
         return str(e), 500
     finally:
         pipe.unwatch()
+
+
+def byte_keys_to_str(dictionary):
+    return {
+        k.decode("utf-8"): v.decode("utf-8") if isinstance(v, bytes) else v
+        for k, v in dictionary.items()
+    }

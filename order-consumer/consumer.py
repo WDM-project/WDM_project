@@ -1,12 +1,13 @@
 import os
-from flask import Flask, jsonify
+
+# from flask import Flask, jsonify
 import redis
 import json
 from kafka import KafkaProducer
 from kafka import KafkaConsumer
 
 
-app = Flask("order-consumer-service")
+# app = Flask("order-consumer-service")
 
 db: redis.Redis = redis.Redis(
     host=os.environ["REDIS_HOST"],

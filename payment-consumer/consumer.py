@@ -2,9 +2,10 @@ from kafka import KafkaConsumer, KafkaProducer
 import json
 import os
 import redis
-from flask import Flask, jsonify
 
-app = Flask("payment-consumer-service")
+# from flask import Flask, jsonify
+
+# app = Flask("payment-consumer-service")
 
 
 db: redis.Redis = redis.Redis(
@@ -40,13 +41,13 @@ def remove_credit(user_id: str, order_id: str, amount: int):
         current_credit = result[0]
         current_credit = int(current_credit)
         if current_credit < int(amount):
-            return jsonify({"error": "Insufficient credit"}), 400
+            return {"error": "Insufficient credit"}, 400
 
         pipe.multi()
         pipe.hincrby(user_key, "credit", -int(amount))
         pipe.hset(order_key, "paid", "True")
         pipe.execute()
-        return jsonify({"status": "success"}), 200
+        return {"status": "success"}, 200
     except Exception as e:
         return str(e), 500
     finally:
@@ -64,7 +65,7 @@ def cancel_payment(user_id: str, order_id: str):
         result = pipe.execute()
         order_data = result[0]
         if not order_data:
-            return jsonify({"error": "Order not found"}), 400
+            return {"error": "Order not found"}, 400
 
         if order_data[b"paid"] == b"True":
             total_cost = int(order_data[b"total_cost"])
@@ -72,26 +73,27 @@ def cancel_payment(user_id: str, order_id: str):
             pipe.hset(order_key, "paid", "False")
             pipe.hincrby(user_key, "credit", total_cost)
             pipe.execute()
-            return jsonify({"status": "success"}), 200
+            return {"status": "success"}, 200
         else:
-            return jsonify({"error": "Payment already cancelled"}), 400
+            return {"error": "Payment already cancelled"}, 400
     except Exception as e:
         return str(e), 500
     finally:
         pipe.reset()
 
+
 consumer.subscribe(["payment_processing_topic"])
 for message in consumer:
-    msg = msg.value
+    msg = message.value
     transaction_id = message.key
     order_data = msg["order_data"]
-    order_id = order_data[b"order_id"].decode()
-    user_id = order_data[b"user_id"].decode()
-    total_cost = int(order_data[b"total_cost"])
+    order_id = order_data["order_id"]
+    user_id = order_data["user_id"]
+    total_cost = int(order_data["total_cost"])
 
     if msg["action"] == "pay":
-        response = remove_credit(user_id, order_id, total_cost)
-        if response.status_code == 200:
+        response, status_code = remove_credit(user_id, order_id, total_cost)
+        if status_code == 200:
             producer.send(
                 "payment_processing_result_topic",
                 key=transaction_id,
@@ -114,8 +116,8 @@ for message in consumer:
                 },
             )
     elif msg["action"] == "cancel":
-        response = cancel_payment(user_id, order_id)
-        if response.status_code == 200:
+        response, status_code = cancel_payment(user_id, order_id)
+        if status_code == 200:
             producer.send(
                 "payment_processing_result_topic",
                 key=transaction_id,

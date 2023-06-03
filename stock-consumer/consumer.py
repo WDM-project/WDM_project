@@ -1,10 +1,9 @@
 from kafka import KafkaConsumer, KafkaProducer
 import json
 import os
-from flask import Flask, jsonify
 import redis
 
-app = Flask("stock-consumer-service")
+# app = Flask("stock-consumer-service")
 
 
 db: redis.Redis = redis.Redis(
@@ -37,12 +36,7 @@ def modify_stock_list(items: list, amount: int):
         # + not - because sign of amount indicates the direction of the transaction
         if stock is None or int(stock) + amount < 0:
             return (
-                jsonify(
-                    {
-                        "error": "Insufficient stock or item not found for item_id: "
-                        + str(item_id)
-                    }
-                ),
+                {"error": "Insufficient stock or item not found for item_id: "},
                 400,
             )
 
@@ -52,7 +46,7 @@ def modify_stock_list(items: list, amount: int):
             item_key = f"item:{item_id}"
             pipe.hincrby(item_key, "stock", amount)
         pipe.execute()
-        return jsonify({"done": True}), 200
+        return {"done": True}, 200
     except Exception as e:
         return str(e), 500
     finally:
@@ -61,13 +55,13 @@ def modify_stock_list(items: list, amount: int):
 
 consumer.subscribe(["stock_check_topic"])
 for message in consumer:
-    msg = msg.value
+    msg = message.value
     transaction_id = message.key
     affected_items = msg["affected_items"]
     # reverse_items = []
     if msg["action"] == "add":
-        response = modify_stock_list(affected_items, 1)
-        if response.status_code != 200:
+        response, status_code = modify_stock_list(affected_items, 1)
+        if status_code != 200:
             producer.send(
                 "stock_check_result_topic",
                 key=transaction_id,
@@ -91,8 +85,8 @@ for message in consumer:
             )
         # reverse_items.append(item_id)
     elif msg["action"] == "remove":
-        response = modify_stock_list(affected_items, 1)
-        if response.status_code != 200:
+        response, status_code = modify_stock_list(affected_items, 1)
+        if status_code != 200:
             producer.send(
                 "stock_check_result_topic",
                 key=transaction_id,
