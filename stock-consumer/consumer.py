@@ -1,6 +1,5 @@
 from kafka import KafkaConsumer, KafkaProducer
 import json
-import requests
 import os
 from flask import Flask, jsonify
 import redis

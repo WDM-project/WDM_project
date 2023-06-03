@@ -2,8 +2,7 @@ import os
 import atexit
 from flask import Flask, jsonify
 import redis
-import json
-import requests
+
 
 app = Flask("stock-service")
 

@@ -2,10 +2,6 @@ import os
 import atexit
 from flask import Flask, jsonify
 import redis
-from kafka import KafkaProducer
-import json
-from kafka import KafkaConsumer
-from threading import Thread
 
 
 app = Flask("payment-consumer-service")
