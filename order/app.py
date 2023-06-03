@@ -226,11 +226,17 @@ def checkout(order_id):
     pipe = db.pipeline(transaction=True)
 
     try:
+        # TODO: see below
+        #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        # problem for now, when one instance die, the consumer start from the beginning,
+        # but the database does not have the global_transaction_id
+
         # set up global transaction id
-        pipe.multi()
-        pipe.hset(global_transaction_key, "status", "pending")
-        pipe.hset(global_transaction_key, "order_id", order_id)
-        pipe.execute()
+        # pipe.multi()
+        # pipe.hset(global_transaction_key, "status", "pending")
+        # pipe.hset(global_transaction_key, "order_id", order_id)
+        # pipe.execute()
+
         pipe.watch(order_key)
         pipe.multi()
         pipe.hgetall(order_key)
@@ -251,16 +257,25 @@ def checkout(order_id):
             value_serializer=lambda v: json.dumps(v).encode("utf-8"),
             key_serializer=lambda v: json.dumps(v).encode("utf-8"),
         )
+        # producer.send(
+        #     "checkout_topic",
+        #     value={"order_data": order_data, "status": "pending"},
+        #     key=global_transaction_id,
+        # )
         # Start of stock check and payment processing.
         # Send a message to Kafka instead of calling the microservices directly.
         producer.send(
             "stock_check_topic",
-            value={"order_data": order_data},
+            value={
+                "affected_items": items,
+                "action": "remove",
+                "is_roll_back": "false",
+            },
             key=global_transaction_id,
         )
         producer.send(
             "payment_processing_topic",
-            value={"order_data": order_data},
+            value={"order_data": order_data, "action": "pay", "is_roll_back": "false"},
             key=global_transaction_id,
         )
 
@@ -282,13 +297,12 @@ def checkout(order_id):
 
         consumer.subscribe(["order_result_topic"])
         for message in consumer:
-            msg = json.loads(message.value)
-            if msg["transaction_id"] == global_transaction_id:
+            if message.key == global_transaction_id:
+                msg = message.value
                 if msg["status"] == "success":
                     return jsonify({"status": "success"}), 200
                 else:
                     return jsonify({"error": "Payment failed"}), 400
-
 
         # the below is for serial processing
         # revert_order_items = []

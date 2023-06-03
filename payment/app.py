@@ -8,7 +8,7 @@ from kafka import KafkaConsumer
 from threading import Thread
 
 
-app = Flask("payment-service")
+app = Flask("payment-consumer-service")
 
 db: redis.Redis = redis.Redis(
     host=os.environ["REDIS_HOST"],

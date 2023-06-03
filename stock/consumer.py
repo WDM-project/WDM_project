@@ -2,124 +2,117 @@ from kafka import KafkaConsumer, KafkaProducer
 import json
 import requests
 import os
-from threading import Thread
+from flask import Flask, jsonify
+import redis
 
-running_in_kubernetes = os.environ.get("RUNNING_IN_KUBERNETES")
-
-if running_in_kubernetes:
-    user_service_url = os.environ["USER_SERVICE_URL"]
-    stock_service_url = os.environ["STOCK_SERVICE_URL"]
-else:
-    gateway_url = os.environ["GATEWAY_URL"]
+app = Flask("stock-consumer-service")
 
 
-def subtract_stock_quantity(item_id, quantity):
-    if running_in_kubernetes:
-        response = requests.post(f"{stock_service_url}/subtract/{item_id}/{quantity}")
-    else:
-        response = requests.post(f"{gateway_url}/stock/subtract/{item_id}/{quantity}")
-
-    return response
-
-
-def add_stock_quantity(item_id, quantity):
-    if running_in_kubernetes:
-        response = requests.post(f"{stock_service_url}/add/{item_id}/{quantity}")
-    else:
-        response = requests.post(f"{gateway_url}/stock/add/{item_id}/{quantity}")
-
-    return response
-
-
-# Setup Kafka consumer
-consumer = KafkaConsumer(
-    "stock_check_topic",
-    bootstrap_servers="localhost:9092",
-    auto_offset_reset="earliest",
-    group_id="stock-consumer-group",
-    value_deserializer=lambda m: json.loads(m.decode("utf-8")),
+db: redis.Redis = redis.Redis(
+    host=os.environ["REDIS_HOST"],
+    port=int(os.environ["REDIS_PORT"]),
+    password=os.environ["REDIS_PASSWORD"],
+    db=int(os.environ["REDIS_DB"]),
 )
 
-consumer2 = KafkaConsumer(
-    "stock_rollback_topic",
-    bootstrap_servers="localhost:9092",
-    auto_offset_reset="earliest",
-    group_id="stock-consumer-group",
-    value_deserializer=lambda m: json.loads(m.decode("utf-8")),
-)
-
-# Setup Kafka producer
 producer = KafkaProducer(
-    bootstrap_servers="localhost:9092",
+    bootstrap_servers="kafka:9092",
     value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+    key_serializer=lambda v: json.dumps(v).encode("utf-8"),
+)
+
+consumer = KafkaConsumer(
+    bootstrap_servers="kafka:9092",
+    auto_offset_reset="earliest",
+    value_deserializer=lambda x: json.loads(x.decode("utf-8")),
+    key_deserializer=lambda x: json.loads(x.decode("utf-8")),
 )
 
 
-def consumer_stock(consumer):
-    for message in consumer:
-        msg = message.value
-        transaction_id = message.key
-        order_id = msg["order_id"]
-        order_data = msg["order_data"]
-        items = json.loads(order_data[b"items"].decode())
-
-        affected_items = []
-
-        for item_id, quantity in items.items():
-            success = subtract_stock_quantity(item_id, quantity)
-            affected_items.append(item_id)
-            if not success.status_code == 200:
-                # If the stock check/update fails, produce a message to the result topic with status 'failure'.
-                producer.send(
-                    "stock_check_result_topic",
+def modify_stock_list(items: list, amount: int):
+    pipe = db.pipeline(transaction=True)
+    # First phase: check all items
+    for item_id in items:
+        item_key = f"item:{item_id}"
+        stock = db.hget(item_key, "stock")
+        # + not - because sign of amount indicates the direction of the transaction
+        if stock is None or int(stock) + amount < 0:
+            return (
+                jsonify(
                     {
-                        "transaction_id": transaction_id,
-                        "status": "failure",
-                        "affected_items": affected_items,
-                    },
-                )
-
-        # If the stock check/update succeeds, produce a message to the result topic with status 'success'.
-        producer.send(
-            "stock_check_result_topic",
-            {
-                "transaction_id": transaction_id,
-                "status": "success",
-                "affected_items": affected_items,
-            },
-        )
-
-
-def consumer_stock_rollback(consumer2):
-    for message in consumer2:
-        msg = message.value
-        transaction_id = message.key
-        order_id = msg["order_id"]
-        order_data = msg["order_data"]
-        items = json.loads(order_data[b"items"].decode())
-        affected_items = []
-
-        for item_id, quantity in items.items():
-            success = add_stock_quantity(item_id, quantity)
-            affected_items.append(item_id)
-            if not success.status_code == 200:
-                # If the stock check/update fails, produce a message to the result topic with status 'failure'.
-                producer.send(
-                    "stock_check_result_rollback_topic",
-                    {"transaction_id": transaction_id, "status": "failure"},
-                )
-                还要写失败rollback怎么办
-        else:
-            # If the stock check/update succeeds, produce a message to the result topic with status 'success'.
-            producer.send(
-                "stock_check_result_rollback_topic",
-                {"transaction_id": transaction_id, "status": "success"},
+                        "error": "Insufficient stock or item not found for item_id: "
+                        + str(item_id)
+                    }
+                ),
+                400,
             )
 
+    # Second phase: actual decrement
+    try:
+        for item_id in items:
+            item_key = f"item:{item_id}"
+            pipe.hincrby(item_key, "stock", amount)
+        pipe.execute()
+        return jsonify({"done": True}), 200
+    except Exception as e:
+        return str(e), 500
+    finally:
+        pipe.reset()
 
-# Start consumer threads
-consumer_thread1 = Thread(target=consumer_stock, args=(consumer,))
-consumer_thread2 = Thread(target=consumer_stock_rollback, atgs=(consumer2,))
 
-consumer_thread1.start()
-consumer_thread2.start()
+consumer.subscribe(["stock_check_topic"])
+for message in consumer:
+    msg = msg.value
+    transaction_id = message.key
+    affected_items = msg["affected_items"]
+    # reverse_items = []
+    if msg["action"] == "add":
+        response = modify_stock_list(affected_items, 1)
+        if response.status_code != 200:
+            producer.send(
+                "stock_check_result_topic",
+                key=transaction_id,
+                value={
+                    "status": "failture",
+                    "affected_items": affected_items,
+                    "is_roll_back": msg["is_roll_back"],
+                    "action": "add",
+                },
+            )
+        else:
+            producer.send(
+                "stock_check_result_topic",
+                key=transaction_id,
+                value={
+                    "status": "success",
+                    "affected_items": affected_items,
+                    "is_roll_back": msg["is_roll_back"],
+                    "action": "add",
+                },
+            )
+        # reverse_items.append(item_id)
+    elif msg["action"] == "remove":
+        response = modify_stock_list(affected_items, 1)
+        if response.status_code != 200:
+            producer.send(
+                "stock_check_result_topic",
+                key=transaction_id,
+                value={
+                    "status": "failture",
+                    "affected_items": affected_items,
+                    "is_roll_back": msg["is_roll_back"],
+                    "action": "remove",
+                },
+            )
+        else:
+            producer.send(
+                "stock_check_result_topic",
+                key=transaction_id,
+                value={
+                    "status": "success",
+                    "affected_items": affected_items,
+                    "is_roll_back": msg["is_roll_back"],
+                    "action": "remove",
+                },
+            )
+        # reverse_items.append(item_id)
