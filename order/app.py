@@ -217,6 +217,22 @@ def find_order(order_id):
         pipe.unwatch()
 
 
+producer = KafkaProducer(
+    bootstrap_servers="kafka:9092",
+    value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+    key_serializer=lambda v: json.dumps(v).encode("utf-8"),
+)
+consumer = KafkaConsumer(
+    bootstrap_servers="kafka:9092",
+    auto_offset_reset="latest",
+    value_deserializer=lambda x: json.loads(x.decode("utf-8")),
+    key_deserializer=lambda x: json.loads(x.decode("utf-8")),
+)
+
+consumer.subscribe(["order_result_topic"])
+print("waiting for order result, consumer has subscribed to order_result_topic")
+
+
 @app.post("/checkout/<order_id>")
 def checkout(order_id):
     global_transaction_id = str(uuid.uuid4())
@@ -229,6 +245,9 @@ def checkout(order_id):
         #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         # problem for now, when one instance die, the consumer start from the beginning,
         # but the database does not have the global_transaction_id
+
+        # TODO multiple duplicate calls of the same order_id
+        #!!!!!!!!!!!!!!!
 
         # set up global transaction id
         # pipe.multi()
@@ -252,11 +271,7 @@ def checkout(order_id):
         # Start of stock check
         # items = json.loads(order_data[b"items"].decode())
         items = order_data["items"]
-        producer = KafkaProducer(
-            bootstrap_servers="kafka:9092",
-            value_serializer=lambda v: json.dumps(v).encode("utf-8"),
-            key_serializer=lambda v: json.dumps(v).encode("utf-8"),
-        )
+
         # producer.send(
         #     "checkout_topic",
         #     value={"order_data": order_data, "status": "pending"},
@@ -264,6 +279,7 @@ def checkout(order_id):
         # )
         # Start of stock check and payment processing.
         # Send a message to Kafka instead of calling the microservices directly.
+        # print("sending stock check message of order_id: ", order_id)
         producer.send(
             "stock_check_topic",
             value={
@@ -273,17 +289,11 @@ def checkout(order_id):
             },
             key=global_transaction_id,
         )
+        # print("sending payment processing message of order_id: ", order_id)
         producer.send(
             "payment_processing_topic",
             value={"order_data": order_data, "action": "pay", "is_roll_back": "false"},
             key=global_transaction_id,
-        )
-
-        consumer = KafkaConsumer(
-            bootstrap_servers="kafka:9092",
-            auto_offset_reset="latest",
-            value_deserializer=lambda x: json.loads(x.decode("utf-8")),
-            key_deserializer=lambda x: json.loads(x.decode("utf-8")),
         )
         # response_statuses = {}
         # consumer.subscribe(
@@ -294,16 +304,19 @@ def checkout(order_id):
         #         msg = json.loads(message.value)
         #         if msg["transaction_id"] == global_transaction_id:
         #             response_statuses[message.topic] = msg["status"]
+        records = consumer.poll(timeout_ms=5000)
 
-        consumer.subscribe(["order_result_topic"])
-        for message in consumer:
-            if message.key == global_transaction_id:
-                msg = message.value
-                if msg["status"] == "success":
-                    return jsonify({"status": "success"}), 200
-                else:
-                    return jsonify({"error": "Payment failed"}), 400
-
+        for tp, messages in records.items():
+            print("received order result messages in line 310", messages)
+            for message in messages:
+                print("unpack message result in line 312", message)
+                if message.key == global_transaction_id:
+                    msg = message.value
+                    if msg["status"] == "success":
+                        return jsonify({"status": "success"}), 200
+                    else:
+                        return jsonify({"error": "Payment failed"}), 400
+        return jsonify({"error": "No result message received, failed"}), 400
         # the below is for serial processing
         # revert_order_items = []
         # for item_id in items:

@@ -20,6 +20,7 @@ producer = KafkaProducer(
 )
 
 consumer = KafkaConsumer(
+    group_id="stock_consumer_group",
     bootstrap_servers="kafka:9092",
     auto_offset_reset="earliest",
     value_deserializer=lambda x: json.loads(x.decode("utf-8")),
@@ -33,10 +34,16 @@ def modify_stock_list(items: list, amount: int):
     for item_id in items:
         item_key = f"item:{item_id}"
         stock = db.hget(item_key, "stock")
-        # + not - because sign of amount indicates the direction of the transaction
-        if stock is None or int(stock) + amount < 0:
+        if stock is None:
             return (
-                {"error": "Insufficient stock or item not found for item_id: "},
+                {"error": "Item not found: "},
+                400,
+            )
+        print("stock in modify stock list function line 41", stock)
+        # + not - because sign of amount indicates the direction of the transaction
+        if int(stock) + amount < 0:
+            return (
+                {"error": "Insufficient stock: "},
                 400,
             )
 
@@ -55,12 +62,14 @@ def modify_stock_list(items: list, amount: int):
 
 consumer.subscribe(["stock_check_topic"])
 for message in consumer:
+    print("stock consumer received message")
     msg = message.value
     transaction_id = message.key
     affected_items = msg["affected_items"]
     # reverse_items = []
     if msg["action"] == "add":
         response, status_code = modify_stock_list(affected_items, 1)
+        print("received modify_stock_list response", response, status_code)
         if status_code != 200:
             producer.send(
                 "stock_check_result_topic",
@@ -72,6 +81,7 @@ for message in consumer:
                     "action": "add",
                 },
             )
+            print("send failture message to stock_check_result_topic")
         else:
             producer.send(
                 "stock_check_result_topic",
@@ -83,9 +93,11 @@ for message in consumer:
                     "action": "add",
                 },
             )
+            print("send success message to stock_check_result_topic")
         # reverse_items.append(item_id)
     elif msg["action"] == "remove":
         response, status_code = modify_stock_list(affected_items, 1)
+        print("received modify_stock_list response", response, status_code)
         if status_code != 200:
             producer.send(
                 "stock_check_result_topic",
@@ -97,6 +109,7 @@ for message in consumer:
                     "action": "remove",
                 },
             )
+            print("send failture message to stock_check_result_topic remove")
         else:
             producer.send(
                 "stock_check_result_topic",
@@ -108,4 +121,5 @@ for message in consumer:
                     "action": "remove",
                 },
             )
+            print("send success message to stock_check_result_topic remove")
         # reverse_items.append(item_id)

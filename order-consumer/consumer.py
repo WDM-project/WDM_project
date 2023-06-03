@@ -6,7 +6,6 @@ import json
 from kafka import KafkaProducer
 from kafka import KafkaConsumer
 
-
 # app = Flask("order-consumer-service")
 
 db: redis.Redis = redis.Redis(
@@ -23,8 +22,9 @@ producer = KafkaProducer(
 )
 
 consumer = KafkaConsumer(
+    group_id="order-consumer-group",
     bootstrap_servers="kafka:9092",
-    auto_offset_reset="latest",
+    auto_offset_reset="earliest",
     value_deserializer=lambda x: json.loads(x.decode("utf-8")),
     key_deserializer=lambda x: json.loads(x.decode("utf-8")),
 )
@@ -38,14 +38,20 @@ class state_tracker:
 
 
 consumer.subscribe(["stock_check_result_topic", "payment_processing_result_topic"])
+print(
+    "subscribed to stock_check_result_topic and payment_processing_result_topic in order-consumer"
+)
 state = state_tracker()
 
 for message in consumer:
+    print("message received at order-consumer and message is:", message)
     msg = message.value
     transaction_id = message.key
     if msg["is_roll_back"] == "true":
         # in case of rollback failure, keep trying to rollback
+        print("rollback message received at order-consumer")
         if msg["status"] == "failure":
+            print("Oops, rollback failed,retrying... for message:", message)
             if message.topic == "stock_check_result_topic":
                 if msg["action"] == "add":
                     producer.send(
@@ -90,16 +96,25 @@ for message in consumer:
                     )
         # rollback succeed, no action needed
         else:
+            print("rollback succeeded for message:", message)
             continue
     # normal message, not a rollback
     if message.topic == "stock_check_result_topic":
+        print("stock_check_result_topic received at order-consumer")
         state.stock_check_result[transaction_id] = message
         # check if the transaction_id is present in both the state variables
         if transaction_id in state.payment_processing_result:
+            print("both the results are present")
             stock_check_result = msg.get("status")
             payment_processing_result = state.payment_processing_result.get(
                 transaction_id
             ).value.get("status")
+            print(
+                "payment_processing_result is:",
+                payment_processing_result,
+                "and stock_check_result is:",
+                stock_check_result,
+            )
             if (
                 payment_processing_result == "success"
                 and stock_check_result == "success"
@@ -183,13 +198,21 @@ for message in consumer:
         else:
             continue
     elif message.topic == "payment_processing_result_topic":
+        print("payment_processing_result_topic received at order-consumer")
         state.payment_processing_result[transaction_id] = message
         # check if the transaction_id is present in both the state variables
         if transaction_id in state.stock_check_result:
+            print("both the results are present")
             stock_check_result = state.stock_check_result.get(transaction_id).value.get(
                 "status"
             )
             payment_processing_result = msg.get("status")
+            print(
+                "stock_check_result is :",
+                stock_check_result,
+                "payment_processing_result is :",
+                payment_processing_result,
+            )
             if (
                 payment_processing_result == "success"
                 and stock_check_result == "success"
@@ -203,6 +226,7 @@ for message in consumer:
                 payment_processing_result == "failure"
                 or stock_check_result == "failure"
             ):
+                print("both failure, going to send failure order result topic message")
                 producer.send(
                     "order_result_topic",
                     key=transaction_id,
