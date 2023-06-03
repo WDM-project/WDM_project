@@ -39,23 +39,45 @@ services:
     env_file:
       - env/payment_redis.env
 
+  payment-consumer-service:
+    build: ./payment-consumer
+    image: payment-consumer:latest
+    command: python consumer.py
+    env_file:
+      - env/payment_redis.env
+
+  order-consumer-service:
+    build: ./order-consumer
+    image: order-consumer:latest
+    command: python consumer.py
+    env_file:
+      - env/order_redis.env
+
+  stock-consumer-service:
+    build: ./stock-consumer
+    image: stock-consumer:latest
+    command: python consumer.py
+    env_file:
+      - env/stock_redis.env
+
   payment-db:
     image: redis:latest
     command: redis-server --requirepass redis --maxmemory 512mb
 
-kafka:
-    image: confluentinc/cp-kafka:latest
-    environment:
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://kafka:19092,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: LISTENER_DOCKER_INTERNAL:PLAINTEXT,LISTENER_DOCKER_EXTERNAL:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: LISTENER_DOCKER_INTERNAL
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-    depends_on:
-      - zookeeper
-
-zookeeper:
-    image: confluentinc/cp-zookeeper:latest
+  zookeeper:
+    image: 'confluentinc/cp-zookeeper:latest'
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - '2181:2181'
+
+  kafka:
+    image: 'confluentinc/cp-kafka:latest'
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1

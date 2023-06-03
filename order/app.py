@@ -7,8 +7,7 @@ import redis
 import json
 from kafka import KafkaProducer
 from kafka import KafkaConsumer
-from threading import Thread
-import asyncio
+
 
 app = Flask("order-service")
 

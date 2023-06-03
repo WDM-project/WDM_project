@@ -2,10 +2,7 @@ import os
 import atexit
 from flask import Flask, jsonify
 import redis
-from kafka import KafkaProducer
 import json
-from kafka import KafkaConsumer
-from threading import Thread
 import requests
 
 app = Flask("stock-service")

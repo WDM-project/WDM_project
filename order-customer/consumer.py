@@ -1,14 +1,10 @@
 import os
-import atexit
-import uuid
-import requests
 from flask import Flask, jsonify
 import redis
 import json
 from kafka import KafkaProducer
 from kafka import KafkaConsumer
-from threading import Thread
-import asyncio
+
 
 app = Flask("order-consumer-service")
 
