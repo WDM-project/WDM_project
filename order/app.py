@@ -7,7 +7,7 @@ import redis
 import json
 from kafka import KafkaProducer
 from kafka import KafkaConsumer
-
+import time
 
 app = Flask("order-service")
 
@@ -248,38 +248,18 @@ def checkout(order_id):
 
         # TODO multiple duplicate calls of the same order_id
         #!!!!!!!!!!!!!!!
-
-        # set up global transaction id
-        # pipe.multi()
-        # pipe.hset(global_transaction_key, "status", "pending")
-        # pipe.hset(global_transaction_key, "order_id", order_id)
-        # pipe.execute()
-
         pipe.watch(order_key)
         pipe.multi()
         pipe.hgetall(order_key)
         result = pipe.execute()
-        # order_data = result[0]
         order_data = byte_keys_to_str(result[0])
         if not order_data:
             return jsonify({"error": "Order not found"}), 400
-        # if we have order_data:
-        # user_id = order_data[b"user_id"].decode()
-        # total_cost = int(order_data[b"total_cost"])
-
-        # Start of stock check
-        # items = json.loads(order_data[b"items"].decode())
+    
         items = order_data["items"]
         list_data = json.loads(items)
         order_data["items"] = list_data
-        # producer.send(
-        #     "checkout_topic",
-        #     value={"order_data": order_data, "status": "pending"},
-        #     key=global_transaction_id,
-        # )
-        # Start of stock check and payment processing.
-        # Send a message to Kafka instead of calling the microservices directly.
-        # print("sending stock check message of order_id: ", order_id)
+        
         producer.send(
             "stock_check_topic",
             value={
@@ -289,25 +269,13 @@ def checkout(order_id):
             },
             key=global_transaction_id,
         )
-        # print("sending payment processing message of order_id: ", order_id)
         producer.send(
             "payment_processing_topic",
             value={"order_data": order_data, "action": "pay", "is_roll_back": "false"},
             key=global_transaction_id,
         )
-        # response_statuses = {}
-        # consumer.subscribe(
-        #     ["stock_check_result_topic", "payment_processing_result_topic"]
-        # )
-        # while len(response_statuses) < 2:
-        #     for message in consumer:
-        #         msg = json.loads(message.value)
-        #         if msg["transaction_id"] == global_transaction_id:
-        #             response_statuses[message.topic] = msg["status"]
-        # records = consumer.poll(timeout_ms=10000)
-
-        # for tp, messages in records.items():
-        # print("received order result messages in line 310", messages)
+        
+        timeout = time.time() + 10  # Timeout duration of 10 seconds
         for message in consumer:
             print("unpack message result in line 312", message)
             if message.key == global_transaction_id:
@@ -316,40 +284,11 @@ def checkout(order_id):
                     return jsonify({"status": "success"}), 200
                 else:
                     return jsonify({"error": "Payment failed"}), 400
-        return jsonify({"error": "Wait too long, quit"}), 400
-        # the below is for serial processing
-        # revert_order_items = []
-        # for item_id in items:
-        #     if not subtract_stock_quantity(
-        #         item_id, 1
-        #     ):  # Check if there's enough stock for each item
-        #         for item_id in revert_order_items:
-        #             add_stock_quantity(
-        #                 item_id, 1
-        #             )  # Revert the stock changes if there's not enough stock for any item
-        #         return jsonify({"error": "Not enough stock"}), 400
-        #     revert_order_items.append(item_id)
-        # # End of stock check
+            if time.time() > timeout:
+                break  # Break the loop if the timeout is reached
 
-        # # Start of payment processing
-        # payment_response = process_payment(
-        #     user_id, order_id, total_cost
-        # )  # Process the payment
-        # if payment_response.status_code == 200:
-        #     pipe.multi()
-        #     pipe.hset(order_key, "paid", "True")
-        #     pipe.execute()
-        #     return jsonify({"status": "success"}), 200
-        # else:
-        #     for item_id in revert_order_items:
-        #         add_stock_quantity(
-        #             item_id, 1
-        #         )  # Revert the stock changes if the payment fails
-        #     return (
-        #         jsonify({"error": payment_response.text}),
-        #         payment_response.status_code,
-        #     )
-        # End of payment processing
+        return jsonify({"error": "Wait too long, quit"}), 400
+        
     except Exception as e:
         return str(e), 500
     finally:
