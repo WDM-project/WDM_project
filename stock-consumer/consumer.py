@@ -33,7 +33,9 @@ def modify_stock_list(items: list, amount: int):
     pipe = db.pipeline(transaction=True)
     # First phase: check all items
     for item_id in items:
+        print("item_id in modify stock list function line 35", item_id)
         item_key = f"item:{item_id}"
+        print("item_key in modify stock list function line 37", item_key)
         stock = db.hget(item_key, "stock")
         print("stock variable in modify stock list function line 38", stock)
         if stock is None:

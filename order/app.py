@@ -263,7 +263,6 @@ def checkout(order_id):
         order_data = byte_keys_to_str(result[0])
         if not order_data:
             return jsonify({"error": "Order not found"}), 400
-
         # if we have order_data:
         # user_id = order_data[b"user_id"].decode()
         # total_cost = int(order_data[b"total_cost"])
@@ -271,7 +270,8 @@ def checkout(order_id):
         # Start of stock check
         # items = json.loads(order_data[b"items"].decode())
         items = order_data["items"]
-
+        list_data = json.loads(items)
+        order_data["items"] = list_data
         # producer.send(
         #     "checkout_topic",
         #     value={"order_data": order_data, "status": "pending"},
@@ -283,7 +283,7 @@ def checkout(order_id):
         producer.send(
             "stock_check_topic",
             value={
-                "affected_items": items,
+                "affected_items": list_data,
                 "action": "remove",
                 "is_roll_back": "false",
             },
@@ -304,7 +304,7 @@ def checkout(order_id):
         #         msg = json.loads(message.value)
         #         if msg["transaction_id"] == global_transaction_id:
         #             response_statuses[message.topic] = msg["status"]
-        records = consumer.poll(timeout_ms=5000)
+        records = consumer.poll(timeout_ms=12000)
 
         for tp, messages in records.items():
             print("received order result messages in line 310", messages)
@@ -316,7 +316,7 @@ def checkout(order_id):
                         return jsonify({"status": "success"}), 200
                     else:
                         return jsonify({"error": "Payment failed"}), 400
-        return jsonify({"error": "No result message received, failed"}), 400
+        return jsonify({"error": "Wait too long, quit"}), 400
         # the below is for serial processing
         # revert_order_items = []
         # for item_id in items:
