@@ -304,18 +304,18 @@ def checkout(order_id):
         #         msg = json.loads(message.value)
         #         if msg["transaction_id"] == global_transaction_id:
         #             response_statuses[message.topic] = msg["status"]
-        records = consumer.poll(timeout_ms=5000)
+        # records = consumer.poll(timeout_ms=10000)
 
-        for tp, messages in records.items():
-            print("received order result messages in line 310", messages)
-            for message in messages:
-                print("unpack message result in line 312", message)
-                if message.key == global_transaction_id:
-                    msg = message.value
-                    if msg["status"] == "success":
-                        return jsonify({"status": "success"}), 200
-                    else:
-                        return jsonify({"error": "Payment failed"}), 400
+        # for tp, messages in records.items():
+        # print("received order result messages in line 310", messages)
+        for message in consumer:
+            print("unpack message result in line 312", message)
+            if message.key == global_transaction_id:
+                msg = message.value
+                if msg["status"] == "success":
+                    return jsonify({"status": "success"}), 200
+                else:
+                    return jsonify({"error": "Payment failed"}), 400
         return jsonify({"error": "Wait too long, quit"}), 400
         # the below is for serial processing
         # revert_order_items = []

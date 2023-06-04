@@ -80,13 +80,13 @@ for message in consumer:
                 "stock_check_result_topic",
                 key=transaction_id,
                 value={
-                    "status": "failture",
+                    "status": "failure",
                     "affected_items": affected_items,
                     "is_roll_back": msg["is_roll_back"],
                     "action": "add",
                 },
             )
-            print("send failture message to stock_check_result_topic")
+            print("send failure message to stock_check_result_topic")
         else:
             producer.send(
                 "stock_check_result_topic",
@@ -108,13 +108,13 @@ for message in consumer:
                 "stock_check_result_topic",
                 key=transaction_id,
                 value={
-                    "status": "failture",
+                    "status": "failure",
                     "affected_items": affected_items,
                     "is_roll_back": msg["is_roll_back"],
                     "action": "remove",
                 },
             )
-            print("send failture message to stock_check_result_topic remove")
+            print("send failure message to stock_check_result_topic remove")
         else:
             producer.send(
                 "stock_check_result_topic",
