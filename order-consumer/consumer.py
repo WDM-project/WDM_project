@@ -119,6 +119,9 @@ for message in consumer:
                 payment_processing_result == "success"
                 and stock_check_result == "success"
             ):
+                print(
+                    "both the results are success, sending out the order_result_topic message"
+                )
                 producer.send(
                     "order_result_topic",
                     key=transaction_id,
@@ -128,6 +131,9 @@ for message in consumer:
                 payment_processing_result == "failure"
                 and stock_check_result == "failure"
             ):
+                print(
+                    "both the results are failure, sending out the order_result_topic message"
+                )
                 producer.send(
                     "order_result_topic",
                     key=transaction_id,
@@ -137,6 +143,9 @@ for message in consumer:
                 payment_processing_result == "success"
                 and stock_check_result == "failure"
             ):
+                print(
+                    "payment_processing_result is success and stock_check_result is failure, sending out the order_result_topic message"
+                )
                 producer.send(
                     "order_result_topic",
                     key=transaction_id,
@@ -145,6 +154,9 @@ for message in consumer:
                 # send the rollback message to the payment_processing_topic
                 temp_msg = state.payment_processing_result.get(transaction_id).value
                 if temp_msg["action"] == "pay":
+                    print(
+                        "sending rollback message to payment_processing_topic with cancel"
+                    )
                     producer.send(
                         "payment_processing_topic",
                         key=transaction_id,
@@ -155,6 +167,9 @@ for message in consumer:
                         },
                     )
                 elif temp_msg["action"] == "cancel":
+                    print(
+                        "sending rollback message to payment_processing_topic with pay"
+                    )
                     producer.send(
                         "payment_processing_topic",
                         key=transaction_id,
@@ -168,6 +183,9 @@ for message in consumer:
                 payment_processing_result == "failure"
                 and stock_check_result == "success"
             ):
+                print(
+                    "payment_processing_result is failure and stock_check_result is success, sending out the order_result_topic message"
+                )
                 producer.send(
                     "order_result_topic",
                     key=transaction_id,
@@ -176,6 +194,9 @@ for message in consumer:
                 # send the rollback message to the stock_check_topic
                 temp_msg = state.stock_check_result.get(transaction_id).value
                 if temp_msg["action"] == "add":
+                    print(
+                        "sending rollback message to stock_check_topic with remove action in line 191"
+                    )
                     producer.send(
                         "stock_check_topic",
                         key=transaction_id,
@@ -186,6 +207,9 @@ for message in consumer:
                         },
                     )
                 elif temp_msg["action"] == "remove":
+                    print(
+                        "sending rollback message to stock_check_topic with add in line 204"
+                    )
                     producer.send(
                         "stock_check_topic",
                         key=transaction_id,
@@ -217,6 +241,7 @@ for message in consumer:
                 payment_processing_result == "success"
                 and stock_check_result == "success"
             ):
+                print("both success, going to send success order result topic message")
                 producer.send(
                     "order_result_topic",
                     key=transaction_id,
@@ -236,6 +261,9 @@ for message in consumer:
                 payment_processing_result == "success"
                 and stock_check_result == "failure"
             ):
+                print(
+                    "payment success and stock failure, going to send failure order result topic message"
+                )
                 producer.send(
                     "order_result_topic",
                     key=transaction_id,
@@ -244,6 +272,9 @@ for message in consumer:
                 # send the rollback message to the payment_processing_topic
                 temp_msg = state.payment_processing_result.get(transaction_id).value
                 if temp_msg["action"] == "pay":
+                    print(
+                        "rollback enabled in line 263, rolling back the payment with cancel action"
+                    )
                     producer.send(
                         "payment_processing_topic",
                         key=transaction_id,
@@ -254,6 +285,9 @@ for message in consumer:
                         },
                     )
                 elif temp_msg["action"] == "cancel":
+                    print(
+                        "rollback enabled in line 273, rolling back the payment with pay action"
+                    )
                     producer.send(
                         "payment_processing_topic",
                         key=transaction_id,
@@ -267,6 +301,9 @@ for message in consumer:
                 payment_processing_result == "failure"
                 and stock_check_result == "success"
             ):
+                print(
+                    "payment failure and stock success, going to send failure order result topic message"
+                )
                 producer.send(
                     "order_result_topic",
                     key=transaction_id,
@@ -275,6 +312,9 @@ for message in consumer:
                 # send the rollback message to the stock_check_topic
                 temp_msg = state.stock_check_result.get(transaction_id).value
                 if temp_msg["action"] == "add":
+                    print(
+                        "rollback enabled in line 296, rolling back the stock check with remove action"
+                    )
                     producer.send(
                         "stock_check_topic",
                         key=transaction_id,
@@ -285,6 +325,9 @@ for message in consumer:
                         },
                     )
                 elif temp_msg["action"] == "remove":
+                    print(
+                        "rollback enabled in line 311, rolling back the stock check with add action"
+                    )
                     producer.send(
                         "stock_check_topic",
                         key=transaction_id,

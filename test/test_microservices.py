@@ -2,6 +2,7 @@ import unittest
 
 import utils as tu
 import requests
+import time
 
 
 class TestMicroservices(unittest.TestCase):
@@ -109,7 +110,7 @@ class TestMicroservices(unittest.TestCase):
         checkout_response = tu.checkout_order(order_id).status_code
         # print(str(checkout_response) + "in line 110")
         self.assertTrue(tu.status_code_is_failure(checkout_response))
-
+        # time.sleep(5)
         stock_after_subtract: int = tu.find_item(item_id1)["stock"]
         self.assertEqual(stock_after_subtract, 15)
 

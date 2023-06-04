@@ -32,6 +32,7 @@ def modify_stock_list(items: list, amount: int):
     print("in modify stock list function line 32", items, amount)
     pipe = db.pipeline(transaction=True)
     # First phase: check all items
+    amount = int(amount)
     for item_id in items:
         print("item_id in modify stock list function line 35", item_id)
         item_key = f"item:{item_id}"
@@ -100,7 +101,7 @@ for message in consumer:
             print("send success message to stock_check_result_topic")
         # reverse_items.append(item_id)
     elif msg["action"] == "remove":
-        response, status_code = modify_stock_list(affected_items, 1)
+        response, status_code = modify_stock_list(affected_items, -1)
         print("received modify_stock_list response", response, status_code)
         if status_code != 200:
             producer.send(

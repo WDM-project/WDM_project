@@ -224,7 +224,7 @@ producer = KafkaProducer(
 )
 consumer = KafkaConsumer(
     bootstrap_servers="kafka:9092",
-    auto_offset_reset="latest",
+    auto_offset_reset="earliest",
     value_deserializer=lambda x: json.loads(x.decode("utf-8")),
     key_deserializer=lambda x: json.loads(x.decode("utf-8")),
 )
@@ -304,7 +304,7 @@ def checkout(order_id):
         #         msg = json.loads(message.value)
         #         if msg["transaction_id"] == global_transaction_id:
         #             response_statuses[message.topic] = msg["status"]
-        records = consumer.poll(timeout_ms=12000)
+        records = consumer.poll(timeout_ms=5000)
 
         for tp, messages in records.items():
             print("received order result messages in line 310", messages)
