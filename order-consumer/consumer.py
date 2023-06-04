@@ -126,7 +126,7 @@ for message in consumer:
                 )
             elif (
                 payment_processing_result == "failure"
-                or stock_check_result == "failure"
+                and stock_check_result == "failure"
             ):
                 producer.send(
                     "order_result_topic",
@@ -224,7 +224,7 @@ for message in consumer:
                 )
             elif (
                 payment_processing_result == "failure"
-                or stock_check_result == "failure"
+                and stock_check_result == "failure"
             ):
                 print("both failure, going to send failure order result topic message")
                 producer.send(
