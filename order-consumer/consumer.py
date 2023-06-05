@@ -5,6 +5,7 @@ import redis
 import json
 from kafka import KafkaProducer
 from kafka import KafkaConsumer
+import threading
 
 # app = Flask("order-consumer-service")
 
@@ -32,6 +33,7 @@ consumer = KafkaConsumer(
 
 class state_tracker:
     def __init__(self):
+        self.lock = threading.Lock()
         self.state = {}
         self.stock_check_result = {}
         self.payment_processing_result = {}
@@ -43,7 +45,8 @@ print(
 )
 state = state_tracker()
 
-for message in consumer:
+
+def process_message(message):
     print("message received at order-consumer and message is:", message)
     msg = message.value
     transaction_id = message.key
@@ -101,7 +104,9 @@ for message in consumer:
     # normal message, not a rollback
     if message.topic == "stock_check_result_topic":
         print("stock_check_result_topic received at order-consumer")
-        state.stock_check_result[transaction_id] = message
+        with state.lock:
+            state.stock_check_result[transaction_id] = message
+        # state.stock_check_result[transaction_id] = message
         # check if the transaction_id is present in both the state variables
         if transaction_id in state.payment_processing_result:
             print("both the results are present")
@@ -220,10 +225,12 @@ for message in consumer:
                         },
                     )
         else:
-            continue
+            print("only stock_check_result is present")
     elif message.topic == "payment_processing_result_topic":
         print("payment_processing_result_topic received at order-consumer")
-        state.payment_processing_result[transaction_id] = message
+        with state.lock:
+            state.stock_check_result[transaction_id] = message
+        # state.payment_processing_result[transaction_id] = message
         # check if the transaction_id is present in both the state variables
         if transaction_id in state.stock_check_result:
             print("both the results are present")
@@ -338,6 +345,10 @@ for message in consumer:
                         },
                     )
         else:
-            continue
+            print("only payment_processing_result is present")
     else:
         raise Exception("Invalid topic from order processing")
+
+
+for message in consumer:
+    threading.Thread(target=process_message, args=(message,)).start()
