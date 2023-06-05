@@ -19,4 +19,4 @@ COPY . .
 RUN chmod +x wait-for-kafka.sh
 
 EXPOSE 5000
-CMD ["./wait-for-kafka.sh", "python", "-u", "consumer.py"]
+CMD ["./wait-for-kafka.sh", "python", "-u", "app.py"]
