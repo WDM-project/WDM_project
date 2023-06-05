@@ -33,3 +33,4 @@ RUN chmod 755 /locust-tasks/run.sh
 
 # Start Locust using LOCUS_OPTS environment variable
 ENTRYPOINT ["/locust-tasks/run.sh"]
+CMD exec /bin/bash -c "trap : TERM INT; sleep infinity & wait"
