@@ -28,3 +28,4 @@ fi
 # echo "$LOCUST $LOCUS_OPTS"
 
 # $LOCUST "$LOCUS_OPTS"
+CMD exec /bin/bash -c "trap : TERM INT; sleep infinity & wait"
