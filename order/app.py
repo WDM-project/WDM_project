@@ -5,9 +5,9 @@ import requests
 from flask import Flask, jsonify
 import redis
 import json
-from kafka import KafkaProducer
-from kafka import KafkaConsumer
+from kafka import KafkaProducer, KafkaConsumer, TopicPartition
 import time
+from kafka.partitioner.default import DefaultPartitioner, murmur2
 
 app = Flask("order-service")
 
@@ -222,15 +222,6 @@ producer = KafkaProducer(
     value_serializer=lambda v: json.dumps(v).encode("utf-8"),
     key_serializer=lambda v: json.dumps(v).encode("utf-8"),
 )
-consumer = KafkaConsumer(
-    bootstrap_servers="kafka:9092",
-    auto_offset_reset="earliest",
-    value_deserializer=lambda x: json.loads(x.decode("utf-8")),
-    key_deserializer=lambda x: json.loads(x.decode("utf-8")),
-)
-
-consumer.subscribe(["order_result_topic"])
-print("waiting for order result, consumer has subscribed to order_result_topic")
 
 
 @app.post("/checkout/<order_id>")
@@ -260,6 +251,25 @@ def checkout(order_id):
         list_data = json.loads(items)
         order_data["items"] = list_data
         
+        consumer = KafkaConsumer(
+            group_id="order-result-group",
+            bootstrap_servers="kafka:9092",
+            auto_offset_reset="earliest",
+            value_deserializer=lambda x: json.loads(x.decode("utf-8")),
+            key_deserializer=lambda x: json.loads(x.decode("utf-8")),
+            consumer_timeout_ms=10000
+        )
+
+        # Hash function of the DefaultPartitioner 
+        # https://github.com/dpkp/kafka-python/blob/master/kafka/partitioner/default.py
+        
+        partitionIndex = murmur2(global_transaction_id.encode('utf-8'))
+        partitionIndex &= 0x7fffffff
+        # https://kafka-python.readthedocs.io/en/master/apidoc/KafkaConsumer.html#kafka.KafkaConsumer.partitions_for_topic
+        partitionIndex %= len(consumer.partitions_for_topic("order_result_topic"))
+        consumer.assign([TopicPartition("order_result_topic", partitionIndex)])
+        print("waiting for order result, consumer has subscribed to order_result_topic")
+
         producer.send(
             "stock_check_topic",
             value={
@@ -274,7 +284,7 @@ def checkout(order_id):
             value={"order_data": order_data, "action": "pay", "is_roll_back": "false"},
             key=global_transaction_id,
         )
-        
+
         timeout = time.time() + 10  # Timeout duration of 10 seconds
         for message in consumer:
             print("unpack message result in line 312", message)
