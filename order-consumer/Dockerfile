@@ -16,4 +16,5 @@ COPY . .
 
 #mac
 RUN chmod +x wait-for-kafka.sh
+CMD ["./wait-for-kafka.sh", "python", "-u", "consumer.py"]
 
