@@ -109,7 +109,8 @@ def process_message(message):
         # state.stock_check_result[transaction_id] = message
         # check if the transaction_id is present in both the state variables
         if transaction_id in state.payment_processing_result:
-            print("both the results are present")
+            print("both the results are present under if")
+            print("the current transaction id is ", transaction_id)
             stock_check_result = msg.get("status")
             payment_processing_result = state.payment_processing_result.get(
                 transaction_id
@@ -229,11 +230,12 @@ def process_message(message):
     elif message.topic == "payment_processing_result_topic":
         print("payment_processing_result_topic received at order-consumer")
         with state.lock:
-            state.stock_check_result[transaction_id] = message
+            state.payment_processing_result[transaction_id] = message
         # state.payment_processing_result[transaction_id] = message
         # check if the transaction_id is present in both the state variables
         if transaction_id in state.stock_check_result:
-            print("both the results are present")
+            print("both the results are present under elif")
+            print("the current transaction id is ", transaction_id)
             stock_check_result = state.stock_check_result.get(transaction_id).value.get(
                 "status"
             )
