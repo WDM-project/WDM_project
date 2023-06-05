@@ -2,11 +2,13 @@ from kafka import KafkaConsumer, KafkaProducer
 import json
 import os
 import redis
+import threading
 
 # from flask import Flask, jsonify
 
 # app = Flask("payment-consumer-service")
 
+db_lock = threading.Lock()
 
 db: redis.Redis = redis.Redis(
     host=os.environ["REDIS_HOST"],
@@ -91,7 +93,9 @@ def cancel_payment(user_id: str, order_id: str):
 
 
 consumer.subscribe(["payment_processing_topic"])
-for message in consumer:
+
+
+def handle_message(message):
     print("Received message in payment consumer")
     msg = message.value
     transaction_id = message.key
@@ -99,10 +103,12 @@ for message in consumer:
     order_id = order_data["order_id"]
     user_id = order_data["user_id"]
     total_cost = int(order_data["total_cost"])
-    print(msg)
+    print(message)
+
     if msg["action"] == "pay":
         print("Going to remove credit")
-        response, status_code = remove_credit(user_id, order_id, total_cost)
+        with db_lock:
+            response, status_code = remove_credit(user_id, order_id, total_cost)
         print("received response from remove credit", response, status_code)
         if status_code == 200:
             producer.send(
@@ -129,7 +135,8 @@ for message in consumer:
             )
             print("Sent failure message to payment processing result topic pay")
     elif msg["action"] == "cancel":
-        response, status_code = cancel_payment(user_id, order_id)
+        with db_lock:
+            response, status_code = cancel_payment(user_id, order_id)
         print("received response from cancel payment", response, status_code)
         if status_code == 200:
             producer.send(
@@ -155,3 +162,8 @@ for message in consumer:
                 },
             )
             print("Sent failure message to payment processing result topic cancel")
+
+
+for message in consumer:
+    thread = threading.Thread(target=handle_message, args=(message,))
+    thread.start()
