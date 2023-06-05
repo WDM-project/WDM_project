@@ -8,3 +8,4 @@ done
 
 echo "Kafka is up - executing command"
 exec $@
+

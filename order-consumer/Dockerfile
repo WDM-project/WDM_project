@@ -13,5 +13,7 @@ apt-get install -y curl netcat  # Added netcat here
 
 COPY . .
 
-RUN chmod +x wait-for-kafka.sh
+
+#mac
+# RUN chmod +x wait-for-kafka.sh
 

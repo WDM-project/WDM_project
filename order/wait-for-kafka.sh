@@ -9,4 +9,3 @@ done
 echo "Kafka is up - executing command"
 exec $@
 
-RUN chmod +x /wait-for-kafka.sh
