@@ -65,3 +65,10 @@ jobs:
         context: ./payment-consumer
         push: true
         tags: ltroin/user-consumer:latest
+
+    - name: Build and push stress-test-service
+      uses: docker/build-push-action@v4
+      with:
+        context: ./stress-test-k8s/docker-image
+        push: true
+        tags: ltroin/stress-test:latest
