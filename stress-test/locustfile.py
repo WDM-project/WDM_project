@@ -16,7 +16,7 @@ with open(os.path.join('..', 'urls.json')) as f:
 
 def create_item(session):
     price = random.uniform(1.0, 10.0)
-    with session.client.post(f"{STOCK_URL}/stock/item/create/{price}", name="/stock/item/create/[price]",
+    with session.client.post(f"{STOCK_URL}/stock/item/create/{int(price)}", name="/stock/item/create/[price]",
                              catch_response=True) as response:
         try:
             item_id = response.json()['item_id']
@@ -24,6 +24,8 @@ def create_item(session):
             response.failure("SERVER ERROR")
         else:
             session.item_ids.append(item_id)
+            print("createItem, item_id === ", item_id)
+            print("type(item_id): ", type(item_id))
 
 
 def add_stock(session, item_idx: int):
@@ -43,7 +45,7 @@ def create_user(session):
 
 def add_balance_to_user(session):
     balance_to_add: float = random.uniform(10000.0, 100000.0)
-    session.client.post(f"{PAYMENT_URL}/payment/add_funds/{session.user_id}/{balance_to_add}",
+    session.client.post(f"{PAYMENT_URL}/payment/add_funds/{session.user_id}/{int(balance_to_add)}",
                         name="/payment/add_funds/[user_id]/[amount]")
 
 
@@ -60,9 +62,18 @@ def add_item_to_order(session, item_idx: int):
     with session.client.post(f"{ORDER_URL}/orders/addItem/{session.order_id}/{session.item_ids[item_idx]}",
                              name="/orders/addItem/[order_id]/[item_id]", catch_response=True) as response:
         if 400 <= response.status_code < 500:
+            print("addItem_to_order_failure, item_id === ", session.item_ids[item_idx], 
+                  "  type ", type(session.item_ids[item_idx]))
+            print("addItem_to_order_failure, order_id === ", session.order_id, 
+                  "  type ", type(session.order_id))
             response.failure(response.text)
         else:
             response.success()
+            print("addItem_to_order_success, item_id === ", session.item_ids[item_idx], 
+                  "  type ", type(session.item_ids[item_idx]))
+            print("addItem_to_order_success, order_id === ", session.order_id, 
+                  "  type ", type(session.order_id))
+            
 
 
 def remove_item_from_order(session, item_idx: int):
@@ -101,10 +112,18 @@ def make_items_stock_zero(session, item_idx: int):
         try:
             stock_to_subtract = response.json()['stock']
         except json.JSONDecodeError:
+            print("make_items_stock_zero_failure, item_id === ", session.item_ids[item_idx],
+                    "  type ", type(session.item_ids[item_idx]))
+            print("make_items_stock_zero_failure, stock_to_subtract === ", stock_to_subtract,
+                    "  type ", type(stock_to_subtract))
             response.failure("SERVER ERROR")
         else:
             session.client.post(f"{STOCK_URL}/stock/subtract/{session.item_ids[item_idx]}/{stock_to_subtract}",
                                 name="/stock/subtract/[item_id]/[number]")
+            print("make_items_stock_zero, item_id === ", session.item_ids[item_idx],
+                    "  type ", type(session.item_ids[item_idx]))
+            print("make_items_stock_zero, stock_to_subtract === ", stock_to_subtract,
+                    "  type ", type(stock_to_subtract))
 
 
 class LoadTest1(SequentialTaskSet):
@@ -356,6 +375,15 @@ class MicroservicesUser(HttpUser):
     # how much time a user waits (seconds) to run another TaskSequence
     wait_time = between(1, 3)
     # [SequentialTaskSet]: [weight of the SequentialTaskSet]
+    # tasks = {
+    #     LoadTest1: 0,
+    #     LoadTest2: 100,
+    #     LoadTest3: 0,
+    #     LoadTest4: 0,
+    #     LoadTest5: 0,
+    #     LoadTest6: 0
+    # }
+
     tasks = {
         LoadTest1: 5,
         LoadTest2: 30,

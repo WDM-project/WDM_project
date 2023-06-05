@@ -13,7 +13,7 @@ services:
     image: order:latest
     environment:
       - GATEWAY_URL=http://gateway:80
-    command: gunicorn -b 0.0.0.0:5000 app:app -w 1 --timeout 10
+    command: ["./wait-for-kafka.sh", "gunicorn", "-b", "0.0.0.0:5000", "app:app", "-w", "1", "--timeout", "10"]
     env_file:
       - env/order_redis.env
 
@@ -39,6 +39,51 @@ services:
     env_file:
       - env/payment_redis.env
 
+  payment-consumer-service:
+    build: ./payment-consumer
+    image: payment-consumer:latest
+    depends_on:
+      - kafka
+    command: ["./wait-for-kafka.sh", "python","-u", "consumer.py"]
+    env_file:
+      - env/payment_redis.env
+
+  order-consumer-service:
+    build: ./order-consumer
+    image: order-consumer:latest
+    depends_on:
+      - kafka
+    command: ["./wait-for-kafka.sh", "python","-u", "consumer.py"]
+    env_file:
+      - env/order_redis.env
+
+  stock-consumer-service:
+    build: ./stock-consumer
+    image: stock-consumer:latest
+    depends_on:
+      - kafka
+    command: ["./wait-for-kafka.sh", "python","-u", "consumer.py"]
+    env_file:
+      - env/stock_redis.env
+
   payment-db:
     image: redis:latest
     command: redis-server --requirepass redis --maxmemory 512mb
+
+  zookeeper:
+    image: 'confluentinc/cp-zookeeper:latest'
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - '2181:2181'
+
+  kafka:
+    image: 'confluentinc/cp-kafka:latest'
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1

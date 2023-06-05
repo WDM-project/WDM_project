@@ -5,10 +5,12 @@ on: push
 jobs:
   build:
 
-    runs-on: ubuntu-latest
+    # runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
-    - uses: actions/checkout@v2
+    # - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
 
     -
         # Setting up Docker Buildx with docker-container driver is required
@@ -34,7 +36,7 @@ jobs:
       with:
         context: ./payment
         push: true
-        tags: ltroin/payment:latest
+        tags: ltroin/user:latest
 
     - name: Build and push stock service
       uses: docker/build-push-action@v4
@@ -42,3 +44,24 @@ jobs:
         context: ./stock
         push: true
         tags: ltroin/stock:latest
+
+    - name: Build and push order-consumer-service
+      uses: docker/build-push-action@v4
+      with:
+        context: ./order-consumer
+        push: true
+        tags: ltroin/order-consumer:latest
+
+    - name: Build and push stock-consumer-service
+      uses: docker/build-push-action@v4
+      with:
+        context: ./stock-consumer
+        push: true
+        tags: ltroin/stock-consumer:latest
+
+    - name: Build and push payment-consumer-service
+      uses: docker/build-push-action@v4
+      with:
+        context: ./payment-consumer
+        push: true
+        tags: ltroin/user-consumer:latest

@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-consumer-service
+spec:
+  selector:
+    component: order-consumer-service
+  ports:
+    - port: 5000
+      name: http
+      targetPort: 5000
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-consumer-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: order-consumer-service
+  template:
+    metadata:
+      labels:
+        component: order-consumer-service
+    spec:
+      containers:
+        - name: order-consumer
+          image: ltroin/order-consumer:latest
+          # env:
+          #   - name: KAFKA_BOOTSTRAP_SERVERS
+          #     value: kafka:9092
+          command: ["./wait-for-kafka.sh", "python","-u", "consumer.py"]
+          ports:
+            - containerPort: 5000
+          env:
+            - name: REDIS_HOST
+              value: redis-master
+            - name: REDIS_PORT
+              value: '6379'
+            - name: REDIS_PASSWORD
+              value: "redis"
+            - name: REDIS_DB
+              value: "0"

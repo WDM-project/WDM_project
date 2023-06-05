@@ -5,6 +5,9 @@ import requests
 from flask import Flask, jsonify
 import redis
 import json
+from kafka import KafkaProducer
+from kafka import KafkaConsumer
+
 
 app = Flask("order-service")
 
@@ -131,6 +134,7 @@ def add_item(order_id, item_id):
         pipe.exists(order_key)
         pipe.hgetall(order_key)
         result = pipe.execute()
+        print("add_item, result === ", result)
         # app.logger.debug(f"Pipeline result: {result}")
         if not result:
             return jsonify({"error": "Result Error In Pipe Execution"}), 400
@@ -157,13 +161,16 @@ def add_item(order_id, item_id):
 @app.delete("/removeItem/<order_id>/<item_id>")
 def remove_item(order_id, item_id):
     order_key = f"order:{order_id}"
+    print("remove_item, order_key === ", order_key)
     pipe = db.pipeline(transaction=True)
     try:
         pipe.watch(order_key)
         pipe.multi()
         pipe.hgetall(order_key)
         result = pipe.execute()
+        print("remove_item, result === ", result)
         order_data = result[0]
+        print("remove_item, order_data === ", order_data)
         if not order_data:
             return jsonify({"error": "Order not found"}), 400
         item_price = get_item_price(item_id)
@@ -210,46 +217,147 @@ def find_order(order_id):
         pipe.unwatch()
 
 
+producer = KafkaProducer(
+    bootstrap_servers="kafka:9092",
+    value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+    key_serializer=lambda v: json.dumps(v).encode("utf-8"),
+)
+consumer = KafkaConsumer(
+    bootstrap_servers="kafka:9092",
+    auto_offset_reset="earliest",
+    value_deserializer=lambda x: json.loads(x.decode("utf-8")),
+    key_deserializer=lambda x: json.loads(x.decode("utf-8")),
+)
+
+consumer.subscribe(["order_result_topic"])
+print("waiting for order result, consumer has subscribed to order_result_topic")
+
+
 @app.post("/checkout/<order_id>")
 def checkout(order_id):
+    global_transaction_id = str(uuid.uuid4())
     order_key = f"order:{order_id}"
+    global_transaction_key = f"global_transaction_id:{global_transaction_id}"
     pipe = db.pipeline(transaction=True)
+
     try:
+        # TODO: see below
+        #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        # problem for now, when one instance die, the consumer start from the beginning,
+        # but the database does not have the global_transaction_id
+
+        # TODO multiple duplicate calls of the same order_id
+        #!!!!!!!!!!!!!!!
+
+        # set up global transaction id
+        # pipe.multi()
+        # pipe.hset(global_transaction_key, "status", "pending")
+        # pipe.hset(global_transaction_key, "order_id", order_id)
+        # pipe.execute()
+
         pipe.watch(order_key)
         pipe.multi()
         pipe.hgetall(order_key)
         result = pipe.execute()
-        order_data = result[0]
+        # order_data = result[0]
+        order_data = byte_keys_to_str(result[0])
         if not order_data:
             return jsonify({"error": "Order not found"}), 400
-        user_id = order_data[b"user_id"].decode()
-        total_cost = int(order_data[b"total_cost"])
-        payment_response = process_payment(user_id, order_id, total_cost)
+        # if we have order_data:
+        # user_id = order_data[b"user_id"].decode()
+        # total_cost = int(order_data[b"total_cost"])
 
-        if payment_response.status_code == 200:
-            items = json.loads(order_data[b"items"].decode())
-            revert_order_items = []
-            for item_id in items:
-                # ************ pay special attetion here, may need changes later ************
-                # this place has bug, if one item is not enough, the whole order will be canceled
-                if not subtract_stock_quantity(item_id, 1):
-                    cancel_response = cancel_payment(user_id, order_id)
-                    if cancel_response == True:
-                        for item_id in revert_order_items:
-                            add_stock_quantity(item_id, 1)
-                        return jsonify({"error": "Not enough stock"}), 400
-                revert_order_items.append(item_id)
-            pipe.multi()
-            # pipe.hset(order_key, "items", json.dumps(items))
-            pipe.hset(order_key, "paid", "True")
-            pipe.execute()
-            return jsonify({"status": "success"}), 200
-        else:
-            return (
-                jsonify({"error": payment_response.text}),
-                payment_response.status_code,
-            )
+        # Start of stock check
+        # items = json.loads(order_data[b"items"].decode())
+        items = order_data["items"]
+        list_data = json.loads(items)
+        order_data["items"] = list_data
+        # producer.send(
+        #     "checkout_topic",
+        #     value={"order_data": order_data, "status": "pending"},
+        #     key=global_transaction_id,
+        # )
+        # Start of stock check and payment processing.
+        # Send a message to Kafka instead of calling the microservices directly.
+        # print("sending stock check message of order_id: ", order_id)
+        producer.send(
+            "stock_check_topic",
+            value={
+                "affected_items": list_data,
+                "action": "remove",
+                "is_roll_back": "false",
+            },
+            key=global_transaction_id,
+        )
+        # print("sending payment processing message of order_id: ", order_id)
+        producer.send(
+            "payment_processing_topic",
+            value={"order_data": order_data, "action": "pay", "is_roll_back": "false"},
+            key=global_transaction_id,
+        )
+        # response_statuses = {}
+        # consumer.subscribe(
+        #     ["stock_check_result_topic", "payment_processing_result_topic"]
+        # )
+        # while len(response_statuses) < 2:
+        #     for message in consumer:
+        #         msg = json.loads(message.value)
+        #         if msg["transaction_id"] == global_transaction_id:
+        #             response_statuses[message.topic] = msg["status"]
+        # records = consumer.poll(timeout_ms=10000)
+
+        # for tp, messages in records.items():
+        # print("received order result messages in line 310", messages)
+        for message in consumer:
+            print("unpack message result in line 312", message)
+            if message.key == global_transaction_id:
+                msg = message.value
+                if msg["status"] == "success":
+                    return jsonify({"status": "success"}), 200
+                else:
+                    return jsonify({"error": "Payment failed"}), 400
+        return jsonify({"error": "Wait too long, quit"}), 400
+        # the below is for serial processing
+        # revert_order_items = []
+        # for item_id in items:
+        #     if not subtract_stock_quantity(
+        #         item_id, 1
+        #     ):  # Check if there's enough stock for each item
+        #         for item_id in revert_order_items:
+        #             add_stock_quantity(
+        #                 item_id, 1
+        #             )  # Revert the stock changes if there's not enough stock for any item
+        #         return jsonify({"error": "Not enough stock"}), 400
+        #     revert_order_items.append(item_id)
+        # # End of stock check
+
+        # # Start of payment processing
+        # payment_response = process_payment(
+        #     user_id, order_id, total_cost
+        # )  # Process the payment
+        # if payment_response.status_code == 200:
+        #     pipe.multi()
+        #     pipe.hset(order_key, "paid", "True")
+        #     pipe.execute()
+        #     return jsonify({"status": "success"}), 200
+        # else:
+        #     for item_id in revert_order_items:
+        #         add_stock_quantity(
+        #             item_id, 1
+        #         )  # Revert the stock changes if the payment fails
+        #     return (
+        #         jsonify({"error": payment_response.text}),
+        #         payment_response.status_code,
+        #     )
+        # End of payment processing
     except Exception as e:
         return str(e), 500
     finally:
         pipe.unwatch()
+
+
+def byte_keys_to_str(dictionary):
+    return {
+        k.decode("utf-8"): v.decode("utf-8") if isinstance(v, bytes) else v
+        for k, v in dictionary.items()
+    }
