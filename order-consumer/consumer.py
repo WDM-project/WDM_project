@@ -100,7 +100,7 @@ def process_message(message):
         # rollback succeed, no action needed
         else:
             print("rollback succeeded for message:", message)
-            continue
+            # continue
     # normal message, not a rollback
     if message.topic == "stock_check_result_topic":
         print("stock_check_result_topic received at order-consumer")
