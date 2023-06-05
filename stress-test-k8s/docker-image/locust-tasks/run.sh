@@ -25,6 +25,6 @@ elif [[ "$LOCUST_MODE" = "worker" ]]; then
     LOCUS_OPTS="$LOCUS_OPTS --worker --master-host=$LOCUST_MASTER"
 fi
 
-# echo "$LOCUST $LOCUS_OPTS"
+echo "$LOCUST $LOCUS_OPTS"
 
-# $LOCUST "$LOCUS_OPTS"
+$LOCUST "$LOCUS_OPTS"

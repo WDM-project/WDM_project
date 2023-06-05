@@ -37,4 +37,4 @@ spec:
             - name: LOCUST_MASTER
               value: locust-master
             - name: TARGET_HOST
-              value: 145.94.238.219
+              value: 192.168.31.37
