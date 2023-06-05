@@ -7,12 +7,15 @@ from typing import List
 from locust import HttpUser, SequentialTaskSet, between, task
 
 # replace the example urls and ports with the appropriate ones
-with open(os.path.join('..', 'urls.json')) as f:
-    urls = json.load(f)
-    ORDER_URL = urls['ORDER_URL']
-    PAYMENT_URL = urls['PAYMENT_URL']
-    STOCK_URL = urls['STOCK_URL']
+# with open(os.path.join('..', 'urls.json')) as f:
+#     urls = json.load(f)
+#     ORDER_URL = urls['ORDER_URL']
+#     PAYMENT_URL = urls['PAYMENT_URL']
+#     STOCK_URL = urls['STOCK_URL']
 
+ORDER_URL = "http://"+os.environ['TARGET_HOST']
+PAYMENT_URL = "http://"+os.environ['TARGET_HOST']
+STOCK_URL = "http://"+os.environ['TARGET_HOST']
 
 def create_item(session):
     price = random.uniform(1.0, 10.0)
