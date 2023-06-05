@@ -219,11 +219,13 @@ def find_order(order_id):
 
 producer = KafkaProducer(
     bootstrap_servers="kafka:9092",
+    api_version=(0, 11, 5),
     value_serializer=lambda v: json.dumps(v).encode("utf-8"),
     key_serializer=lambda v: json.dumps(v).encode("utf-8"),
 )
 consumer = KafkaConsumer(
     bootstrap_servers="kafka:9092",
+    api_version=(0, 11, 5),
     auto_offset_reset="earliest",
     value_deserializer=lambda x: json.loads(x.decode("utf-8")),
     key_deserializer=lambda x: json.loads(x.decode("utf-8")),
