@@ -19,3 +19,5 @@ COPY . .
 RUN chmod +x wait-for-kafka.sh
 
 EXPOSE 5000
+
+CMD exec /bin/bash -c "trap : TERM INT; sleep infinity & wait"
