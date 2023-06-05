@@ -21,6 +21,8 @@ Useful links:
 - https://www.youtube.com/watch?v=OqCK95AS-YE
 - https://www.youtube.com/watch?v=X48VuDVv0do&t=263s
 
+![image-20230605173356719](./kafka.png)
+
 # Test Instructions of Kubernetes
 
 ### 1. Start minikube cluster
@@ -193,3 +195,6 @@ Finally, the measurements are done in two phases:
 ### Interpreting Results
 
 Wait for the script to finish and check how many inconsistencies you have in both the payment and stock services
+
+
+
