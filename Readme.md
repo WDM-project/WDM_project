@@ -14,7 +14,6 @@
 - Availability
 
 
-
 Useful links: 
 
 - https://www.youtube.com/watch?v=JmCn7k0PlV4
@@ -206,3 +205,16 @@ Finally, the measurements are done in two phases:
 ### Interpreting Results
 
 Wait for the script to finish and check how many inconsistencies you have in both the payment and stock services
+
+
+### Current Issues
+
+1) Saga pattern is only implemented during checkout.
+2) Consistency is not guaranteed in practice.
+3) Fault tolerance is not tested but it should work in our design and implementation by enabling kafka offset.
+
+### Future Works
+
+1) Implement partition assigning in kafka.
+2) Implement kafka transactions for all endpoints.
+3) Add timestamps to Redis for deciding execution orders.
