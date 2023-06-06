@@ -48,7 +48,10 @@ print(
 state = state_tracker()
 
 
-def process_message(message):
+# def process_message(message):
+
+
+for message in consumer:
     print("message received at order-consumer and message is:", message)
     msg = message.value
     transaction_id = message.key
@@ -58,7 +61,7 @@ def process_message(message):
     # # If this is not a rollback operation, store the transaction_id in Redis to mark this operation as processed
     # if msg["is_roll_back"] == "false" and db.get(f"transaction:{transaction_id}") is None:
     #     db.set(f"transaction:{transaction_id}", 1)
-    
+
     if msg["is_roll_back"] == "true":
         # in case of rollback failure, keep trying to rollback
         print("rollback message received at order-consumer")
@@ -114,8 +117,8 @@ def process_message(message):
     else:
         if message.topic == "stock_check_result_topic":
             print("stock_check_result_topic received at order-consumer")
-            with state.lock:
-                state.stock_check_result[transaction_id] = message
+            # with state.lock:
+            state.stock_check_result[transaction_id] = message
             # state.stock_check_result[transaction_id] = message
             # check if the transaction_id is present in both the state variables
             if transaction_id in state.payment_processing_result:
@@ -239,16 +242,16 @@ def process_message(message):
                 print("only stock_check_result is present")
         elif message.topic == "payment_processing_result_topic":
             print("payment_processing_result_topic received at order-consumer")
-            with state.lock:
-                state.payment_processing_result[transaction_id] = message
+            # with state.lock:
+            state.payment_processing_result[transaction_id] = message
             # state.payment_processing_result[transaction_id] = message
             # check if the transaction_id is present in both the state variables
             if transaction_id in state.stock_check_result:
                 print("both the results are present under elif")
                 print("the current transaction id is ", transaction_id)
-                stock_check_result = state.stock_check_result.get(transaction_id).value.get(
-                    "status"
-                )
+                stock_check_result = state.stock_check_result.get(
+                    transaction_id
+                ).value.get("status")
                 payment_processing_result = msg.get("status")
                 print(
                     "stock_check_result is :",
@@ -260,7 +263,9 @@ def process_message(message):
                     payment_processing_result == "success"
                     and stock_check_result == "success"
                 ):
-                    print("both success, going to send success order result topic message")
+                    print(
+                        "both success, going to send success order result topic message"
+                    )
                     producer.send(
                         "order_result_topic",
                         key=transaction_id,
@@ -270,7 +275,9 @@ def process_message(message):
                     payment_processing_result == "failure"
                     and stock_check_result == "failure"
                 ):
-                    print("both failure, going to send failure order result topic message")
+                    print(
+                        "both failure, going to send failure order result topic message"
+                    )
                     producer.send(
                         "order_result_topic",
                         key=transaction_id,
@@ -358,10 +365,6 @@ def process_message(message):
                         )
             else:
                 print("only payment_processing_result is present")
-        
+
         else:
             raise Exception("Invalid topic from order processing")
-
-
-for message in consumer:
-    threading.Thread(target=process_message, args=(message,)).start()
