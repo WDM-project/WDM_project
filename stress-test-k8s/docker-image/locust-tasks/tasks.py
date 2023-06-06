@@ -13,9 +13,13 @@ from locust import HttpUser, SequentialTaskSet, between, task
 #     PAYMENT_URL = urls['PAYMENT_URL']
 #     STOCK_URL = urls['STOCK_URL']
 
-ORDER_URL = "http://"+os.environ['TARGET_HOST'] + ":8000"
-PAYMENT_URL = "http://"+os.environ['TARGET_HOST'] + ":8000"
-STOCK_URL = "http://"+os.environ['TARGET_HOST'] + ":8000"
+# ORDER_URL = "http://"+os.environ['TARGET_HOST'] + ":8000"
+# PAYMENT_URL = "http://"+os.environ['TARGET_HOST'] + ":8000"
+# STOCK_URL = "http://"+os.environ['TARGET_HOST'] + ":8000"
+
+ORDER_URL = "http://order-service:5000"
+PAYMENT_URL = "http://user-service:5000"
+STOCK_URL = "http://stock-service:5000"
 
 def create_item(session):
     price = random.uniform(1.0, 10.0)
