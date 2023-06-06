@@ -52,13 +52,6 @@ def process_message(message):
     print("message received at order-consumer and message is:", message)
     msg = message.value
     transaction_id = message.key
-    # if msg["is_roll_back"]=="false" and db.get(f"transaction:{transaction_id}"):
-    #     print(f"Transaction {transaction_id} has been processed before, skipping...")
-    #     return
-    # # If this is not a rollback operation, store the transaction_id in Redis to mark this operation as processed
-    # if msg["is_roll_back"] == "false" and db.get(f"transaction:{transaction_id}") is None:
-    #     db.set(f"transaction:{transaction_id}", 1)
-    
     if msg["is_roll_back"] == "true":
         # in case of rollback failure, keep trying to rollback
         print("rollback message received at order-consumer")
