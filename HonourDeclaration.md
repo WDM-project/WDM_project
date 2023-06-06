@@ -2,7 +2,11 @@ Contribution:
 
 Zihao Xu:
 
-HE He:
+Alex He:
+Implemented Redis operations and basic transaction logic. 
+Helped with the deployment on k8s and stress test.
+Investigated different realizations of transactional protocols.
+
 
 
 Weiting Cai: 
