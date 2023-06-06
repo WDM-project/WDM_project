@@ -17,7 +17,6 @@ https://docs.google.com/document/d/1TQZDls_SEHRFrA7zrQZcXmHQbkmZ66GAa7szJcpooDY/
 - Fault Tolerance
 - Availability
 
-
 Useful links: 
 
 - https://www.youtube.com/watch?v=JmCn7k0PlV4
@@ -27,10 +26,7 @@ Useful links:
 
 ![image-20230605173356719](./kafka.png)
 
-# Test Instructions of Kubernetes
-
 # Test Instructions of Kubernetes Stress Test
-
 
 ### 1. Start minikube cluster
 `minikube start --cpus 7`
@@ -47,14 +43,7 @@ Useful links:
 ### 5. Create a network tunnel to expose services
 `minikube tunnel`
 
-### 6. use 'ipconfig' to find your ipv4 address and replace the values of the TARGET_HOST in these files
-`stress-test-k8s/kubernetes-config/locust-master-controller.yaml`
-
-`stress-test-k8s/kubernetes-config/locust-worker-controller.yaml`
-
-(in line 39 set TARGET_HOST to the IP of your API gateway)
-
-
+### 6. Access http://127.0.0.1:8089 for the locust test.
 
 Stress Test Kubernetes
 The tasks are the same as the stress-test and can be found in stress-test-k8s/docker-image/locust-tasks. This folder is adapted from Google's Distributed load testing using Google Kubernetes Engine and original repo is here. Detailed instructions are in Google's blog post. If you want to deploy locally or with a different cloud provider the lines that you have to change are:
