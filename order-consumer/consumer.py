@@ -47,7 +47,7 @@ print(
 )
 state = state_tracker()
 
-
+# test
 def process_message(message):
     print("message received at order-consumer and message is:", message)
     msg = message.value
