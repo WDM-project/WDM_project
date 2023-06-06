@@ -14,5 +14,5 @@ RUN apt-get update && \
     
 COPY . .
 
-# RUN chmod +x wait-for-kafka.sh
+RUN chmod +x wait-for-kafka.sh
 

@@ -15,5 +15,5 @@ COPY . .
 
 
 #mac
-# RUN chmod +x wait-for-kafka.sh
+RUN chmod +x wait-for-kafka.sh
 
