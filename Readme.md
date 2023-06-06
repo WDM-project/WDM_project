@@ -1,5 +1,9 @@
 ## Architecture: Microservices (Payment + Stock + Order)
 
+The link to detailed project report which highlights our implementation and mutlpile design strategies.
+
+https://docs.google.com/document/d/1TQZDls_SEHRFrA7zrQZcXmHQbkmZ66GAa7szJcpooDY/edit#
+
 ## Framework: Flask + Redis on Kubernetes
 
 - ##### SAGA Pattern for transactions (compensating transactions)
