@@ -21,7 +21,7 @@ Useful links:
 - https://www.youtube.com/watch?v=OqCK95AS-YE
 - https://www.youtube.com/watch?v=X48VuDVv0do&t=263s
 
-# Test Instructions of Kubernetes
+# Test Instructions of Kubernetes Stress Test
 
 ### 1. Start minikube cluster
 `minikube start --cpus 7`
@@ -29,7 +29,7 @@ Useful links:
 ### 2. Start the addon to enable ingress
 `minikube addons enable ingress`
 
-### 3. Deploy the redis
+### 3. Deploy the redis (or you can run scripts of this file manually)
 `bash deploy-charts-minikube.sh`
 
 ### 4. Apply files of k8s cluster to build
@@ -38,8 +38,19 @@ Useful links:
 ### 5. Create a network tunnel to expose services
 `minikube tunnel`
 
-### 6. Test the microservices
-`python test/test_microservices.py`
+### 6. use 'ipconfig' to find your ipv4 address and replace the values of the TARGET_HOST in these files
+stress-test-k8s/kubernetes-config/locust-master-controller.yaml
+stress-test-k8s/kubernetes-config/locust-worker-controller.yaml
+(in line 39 set TARGET_HOST to the IP of your API gateway)
+
+
+
+Stress Test Kubernetes
+The tasks are the same as the stress-test and can be found in stress-test-k8s/docker-image/locust-tasks. This folder is adapted from Google's Distributed load testing using Google Kubernetes Engine and original repo is here. Detailed instructions are in Google's blog post. If you want to deploy locally or with a different cloud provider the lines that you have to change are:
+
+In stress-test-k8s/kubernetes-config/locust-master-controller.yaml line 34 you could add a dockerHub image that you published yourself and in line 39 set TARGET_HOST to the IP of your API gateway.
+Change the same configuration parameters in the stress-test-k8s/kubernetes-config/locust-worker-controller.yaml
+
 
 #### get all the pods status
 `kubectl get pods`
