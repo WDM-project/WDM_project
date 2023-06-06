@@ -4,7 +4,7 @@ from flask import Flask, jsonify
 import redis
 
 
-app = Flask("payment-consumer-service")
+app = Flask("payment-service")
 
 db: redis.Redis = redis.Redis(
     host=os.environ["REDIS_HOST"],
@@ -22,7 +22,7 @@ atexit.register(close_db_connection)
 
 
 @app.post("/create_user")
-def create_user():
+def create_user_init():
     pipe = db.pipeline(transaction=True)
     try:
         pipe.incr("user_id")
@@ -40,6 +40,24 @@ def create_user():
     finally:
         pipe.reset()
 
+@app.post("/create_user/<user_id>")
+def create_user(user_id):
+    pipe = db.pipeline(transaction=True)
+    try:
+        # pipe.incr("user_id")
+        # result = pipe.execute()  # The result of the INCR command is stored in `result`
+        # user_id = result[
+            # 0
+        # ]  # The result of the INCR command is the first element of `result`
+        user_key = f"user:{user_id}"
+        pipe.multi()
+        pipe.hset(user_key, "credit", 0)
+        pipe.execute()
+        return jsonify({"user_id": user_id}), 200
+    except Exception as e:
+        return str(e), 500
+    finally:
+        pipe.reset()
 
 @app.get("/find_user/<user_id>")
 def find_user(user_id: str):

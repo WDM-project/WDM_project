@@ -16,14 +16,16 @@ db: redis.Redis = redis.Redis(
 )
 
 producer = KafkaProducer(
-    bootstrap_servers="kafka:9092",
+    bootstrap_servers="kafka-service:9092",
+    api_version=(0, 11, 5),
     value_serializer=lambda v: json.dumps(v).encode("utf-8"),
     key_serializer=lambda v: json.dumps(v).encode("utf-8"),
 )
 
 consumer = KafkaConsumer(
     group_id="payment_consumer_group",
-    bootstrap_servers="kafka:9092",
+    bootstrap_servers="kafka-service:9092",
+    api_version=(0, 11, 5),
     auto_offset_reset="earliest",
     value_deserializer=lambda x: json.loads(x.decode("utf-8")),
     key_deserializer=lambda x: json.loads(x.decode("utf-8")),
@@ -100,6 +102,12 @@ for message in consumer:
     user_id = order_data["user_id"]
     total_cost = int(order_data["total_cost"])
     print(msg)
+    if msg["is_roll_back"]=="false" and db.get(f"transaction:{transaction_id}"):
+        print(f"Transaction {transaction_id} has been processed before, skipping...")
+        continue
+    # If this is not a rollback operation, store the transaction_id in Redis to mark this operation as processed
+    if msg["is_roll_back"] == "false" and db.get(f"transaction:{transaction_id}") is None:
+        db.set(f"transaction:{transaction_id}", 1)
     if msg["action"] == "pay":
         print("Going to remove credit")
         response, status_code = remove_credit(user_id, order_id, total_cost)

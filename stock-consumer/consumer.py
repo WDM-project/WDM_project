@@ -14,14 +14,16 @@ db: redis.Redis = redis.Redis(
 )
 
 producer = KafkaProducer(
-    bootstrap_servers="kafka:9092",
+    bootstrap_servers="kafka-service:9092",
+    api_version=(0, 11, 5),
     value_serializer=lambda v: json.dumps(v).encode("utf-8"),
     key_serializer=lambda v: json.dumps(v).encode("utf-8"),
 )
 
 consumer = KafkaConsumer(
     group_id="stock_consumer_group",
-    bootstrap_servers="kafka:9092",
+    bootstrap_servers="kafka-service:9092",
+    api_version=(0, 11, 5),
     auto_offset_reset="earliest",
     value_deserializer=lambda x: json.loads(x.decode("utf-8")),
     key_deserializer=lambda x: json.loads(x.decode("utf-8")),
@@ -71,10 +73,17 @@ for message in consumer:
     msg = message.value
     transaction_id = message.key
     affected_items = msg["affected_items"]
+
     # reverse_items = []
     if msg["action"] == "add":
         response, status_code = modify_stock_list(affected_items, 1)
         print("received modify_stock_list response", response, status_code)
+        if msg["is_roll_back"]=="false" and db.get(f"transaction:{transaction_id}"):
+            print(f"Transaction {transaction_id} has been processed before, skipping...")
+            continue
+        # If this is not a rollback operation, store the transaction_id in Redis to mark this operation as processed
+        if msg["is_roll_back"] == "false" and db.get(f"transaction:{transaction_id}") is None:
+            db.set(f"transaction:{transaction_id}", 1)
         if status_code != 200:
             producer.send(
                 "stock_check_result_topic",

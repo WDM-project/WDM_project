@@ -2,7 +2,7 @@
 
 echo "Waiting for Kafka to be available..."
 
-until nc -z kafka 9092; do
+until nc -z kafka-service 9092; do
   sleep 5
 done
 

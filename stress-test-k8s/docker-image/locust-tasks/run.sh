@@ -16,15 +16,18 @@
 
 
 LOCUST="/usr/local/bin/locust"
-LOCUS_OPTS="-f /locust-tasks/tasks.py --host=$TARGET_HOST"
+LOCUS_OPTS="/locust-tasks/tasks.py"
+# LOCUS_OPTS="-f /locust-tasks/tasks.py --host=$TARGET_HOST"
 LOCUST_MODE=${LOCUST_MODE:-standalone}
 
 if [[ "$LOCUST_MODE" = "master" ]]; then
-    LOCUS_OPTS="$LOCUS_OPTS --master"
+    $LOCUST -f "$LOCUS_OPTS" --master --host=$TARGET_HOST
+    # LOCUS_OPTS="$LOCUS_OPTS --master"
 elif [[ "$LOCUST_MODE" = "worker" ]]; then
-    LOCUS_OPTS="$LOCUS_OPTS --worker --master-host=$LOCUST_MASTER"
+    $LOCUST -f "$LOCUS_OPTS" --host=$TARGET_HOST --worker --master-host=$LOCUST_MASTER
+    # LOCUS_OPTS="$LOCUS_OPTS --worker --master-host=$LOCUST_MASTER"
 fi
 
-echo "$LOCUST $LOCUS_OPTS"
+# echo "$LOCUST $LOCUS_OPTS"
 
-$LOCUST "$LOCUS_OPTS"
+# $LOCUST "$LOCUS_OPTS"

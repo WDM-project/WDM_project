@@ -30,11 +30,11 @@ spec:
     spec:
       containers:
         - name: locust-worker
-          image: ${REGION}-docker.pkg.dev/${PROJECT}/${AR_REPO}/${LOCUST_IMAGE_NAME}:${LOCUST_IMAGE_TAG}
+          image: ltroin/stress-test:latest
           env:
             - name: LOCUST_MODE
               value: worker
             - name: LOCUST_MASTER
               value: locust-master
             - name: TARGET_HOST
-              value: https://${SAMPLE_APP_TARGET}
+              value: 127.0.0.1
