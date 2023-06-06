@@ -141,7 +141,7 @@ In the provided stress test we have created 6 scenarios:
 5) Scenario that is supposed to fail because the second item does not have enough stock
 
 6) Scenario that is supposed to fail because the user does not have enough credit
-
+  
 To change the weight (task frequency) of the provided scenarios you can change the weights in the `tasks` definition (line 358)
 With our locust file each user will make one request between 1 and 15 seconds (you can change that in line 356).
 
