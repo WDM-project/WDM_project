@@ -22,7 +22,7 @@ atexit.register(close_db_connection)
 
 
 @app.post("/create_user")
-def create_user():
+def create_user_init():
     pipe = db.pipeline(transaction=True)
     try:
         pipe.incr("user_id")

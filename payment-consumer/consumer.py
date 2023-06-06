@@ -16,7 +16,7 @@ db: redis.Redis = redis.Redis(
 )
 
 producer = KafkaProducer(
-    bootstrap_servers="kafka:9092",
+    bootstrap_servers="kafka-service:9092",
     api_version=(0, 11, 5),
     value_serializer=lambda v: json.dumps(v).encode("utf-8"),
     key_serializer=lambda v: json.dumps(v).encode("utf-8"),
@@ -24,7 +24,7 @@ producer = KafkaProducer(
 
 consumer = KafkaConsumer(
     group_id="payment_consumer_group",
-    bootstrap_servers="kafka:9092",
+    bootstrap_servers="kafka-service:9092",
     api_version=(0, 11, 5),
     auto_offset_reset="earliest",
     value_deserializer=lambda x: json.loads(x.decode("utf-8")),
