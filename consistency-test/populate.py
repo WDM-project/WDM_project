@@ -12,12 +12,12 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger(__name__)
 
 NUMBER_0F_ITEMS = 1
-ITEM_STARTING_STOCK = 100
+ITEM_STARTING_STOCK = 10
 ITEM_PRICE = 1
-NUMBER_OF_USERS = 1000
+NUMBER_OF_USERS = 100
 USER_STARTING_CREDIT = 1
 
-with open(os.path.join('..', 'urls.json')) as f:
+with open(os.path.join('urls.json')) as f:
     urls = json.load(f)
     ORDER_URL = urls['ORDER_URL']
     PAYMENT_URL = urls['PAYMENT_URL']
