@@ -4,6 +4,8 @@ The link to detailed project report which highlights our implementation and mutl
 
 https://docs.google.com/document/d/1TQZDls_SEHRFrA7zrQZcXmHQbkmZ66GAa7szJcpooDY/edit#
 
+Click here to see our [declaration of honour](declaration.md).
+
 This report presents the design and implementation of a distributed e-commerce system using a microservices 
 architecture in `Flask` and `Redis`. The procedure involves several components, including `order-service`, `payment-service`, 
 `stock-service`, and `consumers` of different services to handle various events. `Kafka` is used as a 
