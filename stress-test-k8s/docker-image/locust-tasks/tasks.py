@@ -23,7 +23,7 @@ STOCK_URL = "http://stock-service:5000"
 
 def create_item(session):
     price = random.uniform(1.0, 10.0)
-    with session.client.post(f"{STOCK_URL}/stock/item/create/{price}", name="/stock/item/create/[price]",
+    with session.client.post(f"{STOCK_URL}/item/create/{price}", name="/stock/item/create/[price]",
                              catch_response=True) as response:
         try:
             item_id = response.json()['item_id']
@@ -35,12 +35,12 @@ def create_item(session):
 
 def add_stock(session, item_idx: int):
     stock_to_add = random.randint(100, 1000)
-    session.client.post(f"{STOCK_URL}/stock/add/{session.item_ids[item_idx]}/{stock_to_add}",
+    session.client.post(f"{STOCK_URL}/add/{session.item_ids[item_idx]}/{stock_to_add}",
                         name="/stock/add/[item_id]/[number]")
 
 
 def create_user(session):
-    with session.client.post(f"{PAYMENT_URL}/payment/create_user", name="/payment/create_user",
+    with session.client.post(f"{PAYMENT_URL}/create_user", name="/payment/create_user",
                              catch_response=True) as response:
         try:
             session.user_id = response.json()['user_id']
@@ -50,12 +50,12 @@ def create_user(session):
 
 def add_balance_to_user(session):
     balance_to_add: float = random.uniform(10000.0, 100000.0)
-    session.client.post(f"{PAYMENT_URL}/payment/add_funds/{session.user_id}/{balance_to_add}",
+    session.client.post(f"{PAYMENT_URL}/add_funds/{session.user_id}/{balance_to_add}",
                         name="/payment/add_funds/[user_id]/[amount]")
 
 
 def create_order(session):
-    with session.client.post(f"{ORDER_URL}/orders/create/{session.user_id}", name="/orders/create/[user_id]",
+    with session.client.post(f"{ORDER_URL}/create/{session.user_id}", name="/orders/create/[user_id]",
                              catch_response=True) as response:
         try:
             session.order_id = response.json()['order_id']
@@ -64,7 +64,7 @@ def create_order(session):
 
 
 def add_item_to_order(session, item_idx: int):
-    with session.client.post(f"{ORDER_URL}/orders/addItem/{session.order_id}/{session.item_ids[item_idx]}",
+    with session.client.post(f"{ORDER_URL}/addItem/{session.order_id}/{session.item_ids[item_idx]}",
                              name="/orders/addItem/[order_id]/[item_id]", catch_response=True) as response:
         if 400 <= response.status_code < 500:
             response.failure(response.text)
@@ -73,7 +73,7 @@ def add_item_to_order(session, item_idx: int):
 
 
 def remove_item_from_order(session, item_idx: int):
-    with session.client.delete(f"{ORDER_URL}/orders/removeItem/{session.order_id}/{session.item_ids[item_idx]}",
+    with session.client.delete(f"{ORDER_URL}/removeItem/{session.order_id}/{session.item_ids[item_idx]}",
                                name="/orders/removeItem/[order_id]/[item_id]", catch_response=True) as response:
         if 400 <= response.status_code < 500:
             response.failure(response.text)
@@ -82,7 +82,7 @@ def remove_item_from_order(session, item_idx: int):
 
 
 def checkout_order(session):
-    with session.client.post(f"{ORDER_URL}/orders/checkout/{session.order_id}", name="/orders/checkout/[order_id]",
+    with session.client.post(f"{ORDER_URL}/checkout/{session.order_id}", name="/orders/checkout/[order_id]",
                              catch_response=True) as response:
         if 400 <= response.status_code < 500:
             response.failure(response.text)
@@ -91,7 +91,7 @@ def checkout_order(session):
 
 
 def checkout_order_that_is_supposed_to_fail(session, reason: int):
-    with session.client.post(f"{ORDER_URL}/orders/checkout/{session.order_id}", name="/orders/checkout/[order_id]",
+    with session.client.post(f"{ORDER_URL}/checkout/{session.order_id}", name="/orders/checkout/[order_id]",
                              catch_response=True) as response:
         if 400 <= response.status_code < 500:
             response.success()
@@ -103,14 +103,14 @@ def checkout_order_that_is_supposed_to_fail(session, reason: int):
 
 
 def make_items_stock_zero(session, item_idx: int):
-    with session.client.get(f"{STOCK_URL}/stock/find/{session.item_ids[item_idx]}", name="/stock/find/[item_id]",
+    with session.client.get(f"{STOCK_URL}/find/{session.item_ids[item_idx]}", name="/stock/find/[item_id]",
                             catch_response=True) as response:
         try:
             stock_to_subtract = response.json()['stock']
         except json.JSONDecodeError:
             response.failure("SERVER ERROR")
         else:
-            session.client.post(f"{STOCK_URL}/stock/subtract/{session.item_ids[item_idx]}/{stock_to_subtract}",
+            session.client.post(f"{STOCK_URL}/subtract/{session.item_ids[item_idx]}/{stock_to_subtract}",
                                 name="/stock/subtract/[item_id]/[number]")
 
 
