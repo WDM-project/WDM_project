@@ -1,6 +1,7 @@
 Contribution:
 
 Zihao Xu:
+I initially implemented the first version of the database, which was serialized. To enhance its performance, I introduced support for Redis transaction pipeline. I experimented with the DTM library, which supports certain Redis actions but is written in Go. Since its return types differed significantly from this project and modifying them would require altering the DTM library source code, I decided not to proceed with it. Then, I proceeded to implement the entire Kafka flow. Additionally, I considered and implemented comprehensive multi-threading techniques to further improve performance.
 
 Alex He:
 Implemented Redis operations and basic transaction logic. 
