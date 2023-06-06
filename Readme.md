@@ -42,6 +42,7 @@ Useful links:
 `stress-test-k8s/kubernetes-config/locust-master-controller.yaml`
 
 `stress-test-k8s/kubernetes-config/locust-worker-controller.yaml`
+
 (in line 39 set TARGET_HOST to the IP of your API gateway)
 
 
