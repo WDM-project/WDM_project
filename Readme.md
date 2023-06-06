@@ -39,8 +39,8 @@ Useful links:
 `minikube tunnel`
 
 ### 6. use 'ipconfig' to find your ipv4 address and replace the values of the TARGET_HOST in these files
-stress-test-k8s/kubernetes-config/locust-master-controller.yaml
-stress-test-k8s/kubernetes-config/locust-worker-controller.yaml
+`stress-test-k8s/kubernetes-config/locust-master-controller.yaml`
+`stress-test-k8s/kubernetes-config/locust-worker-controller.yaml`
 (in line 39 set TARGET_HOST to the IP of your API gateway)
 
 
