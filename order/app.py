@@ -328,7 +328,7 @@ def checkout(order_id):
         # wait for the consumer thread to put a message in the queue
         while True:
             try:
-                msg = queue.get(timeout=10)  # wait for 10 seconds
+                msg = queue.get(timeout=100)  # wait for 10 seconds
                 if msg["status"] == "success":
                     return jsonify({"status": "success"}), 200
                 else:
