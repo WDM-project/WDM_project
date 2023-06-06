@@ -13,7 +13,10 @@ Helped with debugging the services and deployment scripts.
 Worked with presentation
 
 YuChuan Fu:
-
+Worked on the deployment of stress test environment, kafka, and consumers on kubernetes.
+Studied topics related to kafka and how to implement in our structure.
+Identified data type errors in business logic processing.
+Drew and participated in the design of kafka producer consumer diagram.
 
 Jiacheng Zhang:
 Worked with Kafka workflow, transactional protocol, multithread functions. 
