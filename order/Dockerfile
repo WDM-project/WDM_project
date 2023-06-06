@@ -16,6 +16,7 @@ apt-get install -y curl netcat  # Added netcat here
 
 COPY . .
 
-# RUN chmod +x wait-for-kafka.sh
+RUN chmod +x wait-for-kafka.sh
 
 EXPOSE 5000
+CMD ["./wait-for-kafka.sh", "python", "-u", "app.py"]

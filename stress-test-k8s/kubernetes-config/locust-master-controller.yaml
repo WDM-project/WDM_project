@@ -31,12 +31,12 @@ spec:
     spec:
       containers:
         - name: locust-master
-          image: ${REGION}-docker.pkg.dev/${PROJECT}/${AR_REPO}/${LOCUST_IMAGE_NAME}:${LOCUST_IMAGE_TAG}
+          image: ltroin/stress-test:latest
           env:
             - name: LOCUST_MODE
               value: master
             - name: TARGET_HOST
-              value: https://${SAMPLE_APP_TARGET}
+              value: 145.94.232.58
           ports:
             - name: loc-master-web
               containerPort: 8089
