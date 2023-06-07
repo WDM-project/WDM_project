@@ -31,7 +31,7 @@ Below is the Kafka architecture of our project:
 #### (4) Apply files of k8s deployment
 `kubectl apply -f k8s/.`
 
-`kubectl apply -f stress-test-k8s/kubernetes-config.`
+`kubectl apply -f stress-test-k8s/kubernetes-config`
 
 #### (5) Create a network tunnel to expose services
 `minikube tunnel`
