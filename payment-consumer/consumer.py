@@ -102,10 +102,8 @@ def remove_credit(user_id: str, order_id: str, amount: int):
         pipe.hincrby(user_key, "credit", -int(amount))
         pipe.hset(order_key, "paid", "True")
         pipe.execute()
-        pipe.multi()
-        pipe.hgetall(order_key)
-        result = pipe.execute()
-        order_data = result[0]
+
+        order_data = db.hgetall(order_key)
         print("order data at the end of remove credit function", order_data)
         return {"status": "success"}, 200
     except Exception as e:
