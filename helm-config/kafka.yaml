@@ -1,0 +1,10 @@
+provisioning:
+  enabled: true 
+  topics: 
+    - name: payment_processing_topic
+      partitions: 2
+kraft:
+  enabled: false
+zookeeper:
+  enabled: true
+

@@ -122,7 +122,7 @@ for message in consumer:
                     "action": "pay",
                     "is_roll_back": msg["is_roll_back"],
                 },
-                partition=0,
+                partition=1,
             )
             print("Sent success message to payment processing result topic pay")
         else:
