@@ -8,3 +8,4 @@ helm install -f helm-config/redis-helm-values.yaml redis1 bitnami/redis
 helm install -f helm-config/redis-helm-values.yaml redis2 bitnami/redis
 kubectl apply -f k8s/.
 kubectl apply -f stress-test-k8s/kubernetes-config.
+kubectl get pods

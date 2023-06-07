@@ -97,7 +97,7 @@ for message in consumer:
                     "is_roll_back": msg["is_roll_back"],
                     "action": "add",
                 },
-                partition=0,
+                
             )
             print("send failure message to stock_check_result_topic")
         else:
@@ -110,7 +110,7 @@ for message in consumer:
                     "is_roll_back": msg["is_roll_back"],
                     "action": "add",
                 },
-                partition=0,
+                
             )
             print("send success message to stock_check_result_topic")
         # reverse_items.append(item_id)
@@ -127,7 +127,7 @@ for message in consumer:
                     "is_roll_back": msg["is_roll_back"],
                     "action": "remove",
                 },
-                partition=0,
+                
             )
             print("send failure message to stock_check_result_topic remove")
         else:
@@ -140,7 +140,7 @@ for message in consumer:
                     "is_roll_back": msg["is_roll_back"],
                     "action": "remove",
                 },
-                partition=0,
+                
             )
             print("send success message to stock_check_result_topic remove")
         # reverse_items.append(item_id)

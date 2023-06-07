@@ -79,7 +79,7 @@ def process_message(message):
                             "action": "add",
                             "is_roll_back": "true",
                         },
-                        partition=0,
+                        
                     )
                 elif msg["action"] == "remove":
                     producer.send(
@@ -90,7 +90,7 @@ def process_message(message):
                             "action": "remove",
                             "is_roll_back": "true",
                         },
-                        partition=0,
+                        
                     )
             elif message.topic == "payment_processing_result_topic":
                 if msg["action"] == "pay":
@@ -102,7 +102,7 @@ def process_message(message):
                             "action": "pay",
                             "is_roll_back": "true",
                         },
-                        partition=0,
+                        
                     )
                 elif msg["action"] == "cancel":
                     producer.send(
@@ -113,7 +113,7 @@ def process_message(message):
                             "action": "cancel",
                             "is_roll_back": "true",
                         },
-                        partition=0,
+                        
                     )
         # rollback succeed, no action needed
         else:
@@ -151,7 +151,7 @@ def process_message(message):
                         "order_result_topic",
                         key=transaction_id,
                         value={"status": "success"},
-                        partition=0,
+                        
                     )
                 elif (
                     payment_processing_result == "failure"
@@ -164,7 +164,7 @@ def process_message(message):
                         "order_result_topic",
                         key=transaction_id,
                         value={"status": "failure"},
-                        partition=0,
+                        
                     )
                 elif (
                     payment_processing_result == "success"
@@ -177,7 +177,7 @@ def process_message(message):
                         "order_result_topic",
                         key=transaction_id,
                         value={"status": "failure"},
-                        partition=0,
+                        
                     )
                     # send the rollback message to the payment_processing_topic
                     temp_msg = state.payment_processing_result.get(transaction_id).value
@@ -193,7 +193,7 @@ def process_message(message):
                                 "action": "cancel",
                                 "is_roll_back": "true",
                             },
-                            partition=0,
+                            
                         )
                     elif temp_msg["action"] == "cancel":
                         print(
@@ -207,7 +207,7 @@ def process_message(message):
                                 "action": "pay",
                                 "is_roll_back": "true",
                             },
-                            partition=0,
+                            
                         )
                 elif (
                     payment_processing_result == "failure"
@@ -220,7 +220,7 @@ def process_message(message):
                         "order_result_topic",
                         key=transaction_id,
                         value={"status": "failure"},
-                        partition=0,
+                        
                     )
                     # send the rollback message to the stock_check_topic
                     temp_msg = state.stock_check_result.get(transaction_id).value
@@ -236,7 +236,7 @@ def process_message(message):
                                 "action": "remove",
                                 "is_roll_back": "true",
                             },
-                            partition=0,
+                            
                         )
                     elif temp_msg["action"] == "remove":
                         print(
@@ -250,7 +250,7 @@ def process_message(message):
                                 "action": "add",
                                 "is_roll_back": "true",
                             },
-                            partition=0,
+                            
                         )
             else:
                 print("only stock_check_result is present")
@@ -284,7 +284,7 @@ def process_message(message):
                         "order_result_topic",
                         key=transaction_id,
                         value={"status": "success"},
-                        partition=0,
+                        
                     )
                 elif (
                     payment_processing_result == "failure"
@@ -297,7 +297,7 @@ def process_message(message):
                         "order_result_topic",
                         key=transaction_id,
                         value={"status": "failure"},
-                        partition=0,
+                        
                     )
                 elif (
                     payment_processing_result == "success"
@@ -310,7 +310,7 @@ def process_message(message):
                         "order_result_topic",
                         key=transaction_id,
                         value={"status": "failure"},
-                        partition=0,
+                        
                     )
                     # send the rollback message to the payment_processing_topic
                     temp_msg = state.payment_processing_result.get(transaction_id).value
@@ -326,7 +326,7 @@ def process_message(message):
                                 "action": "cancel",
                                 "is_roll_back": "true",
                             },
-                            partition=0,
+                            
                         )
                     elif temp_msg["action"] == "cancel":
                         print(
@@ -340,7 +340,7 @@ def process_message(message):
                                 "action": "pay",
                                 "is_roll_back": "true",
                             },
-                            partition=0,
+                            
                         )
                 elif (
                     payment_processing_result == "failure"
@@ -353,7 +353,7 @@ def process_message(message):
                         "order_result_topic",
                         key=transaction_id,
                         value={"status": "failure"},
-                        partition=0,
+                        
                     )
                     # send the rollback message to the stock_check_topic
                     temp_msg = state.stock_check_result.get(transaction_id).value
@@ -369,7 +369,7 @@ def process_message(message):
                                 "action": "remove",
                                 "is_roll_back": "true",
                             },
-                            partition=0,
+                            
                         )
                     elif temp_msg["action"] == "remove":
                         print(
@@ -383,7 +383,7 @@ def process_message(message):
                                 "action": "add",
                                 "is_roll_back": "true",
                             },
-                            partition=0,
+                            
                         )
             else:
                 print("only payment_processing_result is present")

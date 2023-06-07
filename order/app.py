@@ -302,14 +302,14 @@ def checkout(order_id):
                 "is_roll_back": "false",
             },
             key=global_transaction_id,
-            partition=0,
+            
         )
         # print("sending payment processing message of order_id: ", order_id)
         producer.send(
             "payment_processing_topic",
             value={"order_data": order_data, "action": "pay", "is_roll_back": "false"},
             key=global_transaction_id,
-            partition=0,
+            
         )
 
         # for message in consumer:

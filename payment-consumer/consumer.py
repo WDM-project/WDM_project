@@ -122,7 +122,7 @@ for message in consumer:
                     "action": "pay",
                     "is_roll_back": msg["is_roll_back"],
                 },
-                partition=0,
+                
             )
             print("Sent success message to payment processing result topic pay")
         else:
@@ -135,7 +135,7 @@ for message in consumer:
                     "action": "pay",
                     "is_roll_back": msg["is_roll_back"],
                 },
-                partition=0,
+                
             )
             print("Sent failure message to payment processing result topic pay")
     elif msg["action"] == "cancel":
@@ -151,7 +151,7 @@ for message in consumer:
                     "action": "cancel",
                     "is_roll_back": msg["is_roll_back"],
                 },
-                partition=0,
+                
             )
             print("Sent success message to payment processing result topic cancel")
         else:
@@ -164,6 +164,6 @@ for message in consumer:
                     "action": "cancel",
                     "is_roll_back": msg["is_roll_back"],
                 },
-                partition=0,
+                
             )
             print("Sent failure message to payment processing result topic cancel")
