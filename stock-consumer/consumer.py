@@ -35,35 +35,36 @@ def modify_stock_list(items: list, amount: int):
     pipe = db.pipeline(transaction=True)
     # First phase: check all items
     amount = int(amount)
+    for item_id in items:
+        print("item_id in modify stock list function line 35", item_id)
+        item_key = f"item:{item_id}"
+        print("item_key in modify stock list function line 37", item_key)
+        stock = db.hget(item_key, "stock")
+        print("stock variable in modify stock list function line 38", stock)
+        if stock is None:
+            return (
+                {"error": "Item not found: "},
+                400,
+            )
+        print("stock in modify stock list function line 41", stock)
+        # + not - because sign of amount indicates the direction of the transaction
+        if int(stock) + amount < 0:
+            return (
+                {"error": "Insufficient stock: "},
+                400,
+            )
+
+    # Second phase: actual decrement
     try:
         for item_id in items:
-            print("item_id in modify stock list function line 35", item_id)
             item_key = f"item:{item_id}"
-            print("item_key in modify stock list function line 37", item_key)
-
-            while True:
-                try:
-                    pipe.watch(item_key)
-                    stock = db.hget(item_key, "stock")
-                    print("stock variable in modify stock list function line 38", stock)
-
-                    if stock is None:
-                        return ({"error": "Item not found: "}, 400)
-
-                    print("stock in modify stock list function line 41", stock)
-
-                    if int(stock) + amount < 0:
-                        return ({"error": "Insufficient stock: "}, 400)
-
-                    pipe.multi()
-                    pipe.hincrby(item_key, "stock", amount)
-                    pipe.execute()
-
-                    break
-                except redis.WatchError:
-                    continue
+            pipe.hincrby(item_key, "stock", amount)
+        pipe.execute()
+        return {"done": True}, 200
     except Exception as e:
         return str(e), 500
+    finally:
+        pipe.reset()
 
 
 consumer.assign([TopicPartition("stock_check_topic", 0)])
