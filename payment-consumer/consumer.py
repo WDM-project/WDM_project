@@ -2,6 +2,7 @@ from kafka import KafkaConsumer, KafkaProducer, TopicPartition
 import json
 import os
 import redis
+from redlock import Redlock
 
 # from flask import Flask, jsonify
 
@@ -13,6 +14,17 @@ db: redis.Redis = redis.Redis(
     port=int(os.environ["REDIS_PORT"]),
     password=os.environ["REDIS_PASSWORD"],
     db=int(os.environ["REDIS_DB"]),
+)
+
+d = Redlock(
+    [
+        {
+            "host": os.environ["REDIS_HOST"],
+            "port": int(os.environ["REDIS_PORT"]),
+            "password": os.environ["REDIS_PASSWORD"],
+            "db": int(os.environ["REDIS_DB"]),
+        },
+    ]
 )
 
 producer = KafkaProducer(

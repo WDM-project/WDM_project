@@ -9,7 +9,7 @@ from kafka import KafkaProducer
 from kafka import KafkaConsumer
 from kafka import TopicPartition
 from queue import Queue
-from threading import Thread
+from threading import Thread, Lock
 import time
 
 app = Flask("order-service")
@@ -34,6 +34,7 @@ def close_db_connection():
     db.close()
 
 
+lock = Lock()
 atexit.register(close_db_connection)
 
 
@@ -227,13 +228,16 @@ producer = KafkaProducer(
     key_serializer=lambda v: json.dumps(v).encode("utf-8"),
 )
 
+transaction_res = {}
+
 
 # this function will be executed in a separate thread for each API call
-def kafka_consumer_thread(consumer, queue, global_transaction_id):
+def kafka_consumer_thread(consumer, global_transaction_id):
     for message in consumer:
         print("Received message:", message)
         if message.key == global_transaction_id:
-            queue.put(message.value)
+            with lock:
+                transaction_res[global_transaction_id] = message.value
             break
 
 
@@ -322,23 +326,23 @@ def checkout(order_id):
         consumer.assign([TopicPartition("order_result_topic", 0)])
         print("waiting for order result, consumer has subscribed to order_result_topic")
 
-        queue = Queue()
         consumer_thread = Thread(
-            target=kafka_consumer_thread, args=(consumer, queue, global_transaction_id)
+            target=kafka_consumer_thread, args=(consumer, global_transaction_id)
         )
         consumer_thread.start()
 
         # wait for the consumer thread to put a message in the queue
+        start = time.time()
         while True:
-            try:
-                msg = queue.get(timeout=10)  # wait for 10 seconds
+            msg = transaction_res.get(global_transaction_id)
+            if msg is not None:
                 if msg["status"] == "success":
                     return jsonify({"status": "success"}), 200
                 else:
                     return jsonify({"status": "failure"}), 400
-            except queue.Empty:
-                print("No message received after 10 seconds, retrying...")
-                continue
+            current = time.time()
+            if current - start > 10:
+                return jsonify({"error": "Wait too long, quit"}), 400
 
     except Exception as e:
         return str(e), 500
