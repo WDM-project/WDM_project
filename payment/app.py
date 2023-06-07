@@ -66,30 +66,24 @@ def create_user(user_id):
 
 @app.get("/find_user/<user_id>")
 def find_user(user_id: str):
-    my_lock = d.lock("paymentLock", 1000)
-    while True:
-        if my_lock:
-            user_key = f"user:{user_id}"
-            pipe = db.pipeline(transaction=True)
-            try:
-                pipe.watch(user_key)
-                pipe.multi()
-                pipe.hgetall(user_key)
-                result = pipe.execute()
-                user_data = result[0]
-                if not user_data:
-                    return jsonify({"error": "User not found"}), 400
-                return (
-                    jsonify(
-                        {"user_id": int(user_id), "credit": int(user_data[b"credit"])}
-                    ),
-                    200,
-                )
-            except Exception as e:
-                return str(e), 500
-            finally:
-                pipe.reset()
-                d.unlock(my_lock)
+    user_key = f"user:{user_id}"
+    pipe = db.pipeline(transaction=True)
+    try:
+        pipe.watch(user_key)
+        pipe.multi()
+        pipe.hgetall(user_key)
+        result = pipe.execute()
+        user_data = result[0]
+        if not user_data:
+            return jsonify({"error": "User not found"}), 400
+        return (
+            jsonify({"user_id": int(user_id), "credit": int(user_data[b"credit"])}),
+            200,
+        )
+    except Exception as e:
+        return str(e), 500
+    finally:
+        pipe.reset()
 
 
 @app.post("/add_funds/<user_id>/<amount>")
