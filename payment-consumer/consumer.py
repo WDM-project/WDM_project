@@ -3,7 +3,17 @@ import json
 import os
 import redis
 
-# from flask import Flask, jsonify
+from kafka import KafkaAdminClient
+from kafka.admin import NewPartitions
+
+topic = "kafka-service:9092"
+bootstrap_servers = "localhost:9092"
+
+admin_client = KafkaAdminClient(bootstrap_servers=bootstrap_servers)
+topic_partitions = {}
+topic_partitions[topic] = NewPartitions(total_count=3)
+admin_client.create_partitions(topic_partitions)
+from flask import Flask, jsonify
 
 # app = Flask("payment-consumer-service")
 
