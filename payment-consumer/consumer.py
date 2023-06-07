@@ -150,15 +150,14 @@ def cancel_payment(user_id: str, order_id: str):
     pipe_order = db_order.pipeline(transaction=True)
 
     try:
-        pipe_user.watch(user_key)
-        pipe_order.watch(order_key)
-        pipe_order.hgetall(order_key)
-        result_order = pipe_order.execute()
-        print("result order", result_order)
-        order_data = result_order[0]
+        order_data = db_order.hgetall(order_key)
+
         if not order_data:
             return {"error": "Order not found"}, 400
         print("order data", order_data)
+
+        pipe_user.watch(user_key)
+        pipe_order.watch(order_key)
         if order_data[b"paid"] == b"True":
             total_cost = int(order_data[b"total_cost"])
             # Start a transaction for each connection
