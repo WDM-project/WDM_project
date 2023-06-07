@@ -92,7 +92,7 @@ def cancel_payment(user_id: str, order_id: str):
         pipe.reset()
 
 
-consumer.subscribe([TopicPartition("payment_processing_topic", 0)])
+consumer.assign([TopicPartition("payment_processing_topic", 0)])
 for message in consumer:
     print("Received message in payment consumer")
     msg = message.value

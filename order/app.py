@@ -234,7 +234,7 @@ consumer = KafkaConsumer(
     key_deserializer=lambda x: json.loads(x.decode("utf-8")),
 )
 
-consumer.subscribe([TopicPartition("order_result_topic", 0)])
+consumer.assign([TopicPartition("order_result_topic", 0)])
 print("waiting for order result, consumer has subscribed to order_result_topic")
 
 
