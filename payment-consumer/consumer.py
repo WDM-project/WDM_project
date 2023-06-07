@@ -42,6 +42,14 @@ db: redis.Redis = redis.Redis(
     db=int(os.environ["REDIS_DB"]),
 )
 
+
+db_order: redis.Redis = redis.Redis(
+    host="order-db",
+    port=int("6379"),
+    password="redis",
+    db=int("0"),
+)
+
 producer = KafkaProducer(
     bootstrap_servers="kafka-service:9092",
     api_version=(0, 11, 5),
@@ -81,15 +89,24 @@ def remove_credit(user_id: str, order_id: str, amount: int):
     user_key = f"user:{user_id}"
     order_key = f"order:{order_id}"
 
-    order_data = db.hgetall(order_key)
+    order_data = db_order.hgetall(order_key)
     print("order data at the start of remove credit function", order_data)
-    pipe = db.pipeline(transaction=True)
+    pipe_user = db.pipeline(transaction=True)
+    pipe_order = db_order.pipeline(transaction=True)
+
     try:
-        pipe.watch(user_key, order_key)
-        pipe.multi()
-        pipe.hget(user_key, "credit")
-        result = pipe.execute()
-        current_credit = result[0]
+        # Watch the keys
+        pipe_user.watch(user_key)
+        pipe_order.watch(order_key)
+
+        # Start a transaction for each connection
+        pipe_user.multi()
+        pipe_order.multi()
+
+        # Get the current credit
+        pipe_user.hget(user_key, "credit")
+        result_user = pipe_user.execute()
+        current_credit = result_user[0]
         current_credit = int(current_credit)
         print(
             "current credit",
@@ -101,18 +118,28 @@ def remove_credit(user_id: str, order_id: str, amount: int):
         if current_credit < int(amount):
             return {"error": "Insufficient credit"}, 400
 
-        pipe.multi()
-        pipe.hincrby(user_key, "credit", -int(amount))
-        pipe.hset(order_key, "paid", "True")
-        pipe.execute()
+        # Start another transaction for each connection
+        pipe_user.multi()
+        pipe_order.multi()
 
-        order_data = db.hgetall(order_key)
+        # Decrease the credit and set the order as paid
+        pipe_user.hincrby(user_key, "credit", -int(amount))
+        pipe_order.hset(order_key, "paid", "True")
+
+        # Execute the transactions
+        pipe_user.execute()
+        pipe_order.execute()
+
+        # Get the updated order data
+        order_data = db_order.hgetall(order_key)
         print("order data at the end of remove credit function", order_data)
         return {"status": "success"}, 200
     except Exception as e:
         return str(e), 500
     finally:
-        pipe.reset()
+        # Reset the pipelines
+        pipe_user.reset()
+        pipe_order.reset()
 
 
 def cancel_payment(user_id: str, order_id: str):
