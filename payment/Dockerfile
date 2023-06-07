@@ -11,3 +11,5 @@ RUN apt-get update && \
 COPY . .
 
 EXPOSE 5000
+
+CMD ["./wait-for-kafka.sh", "python", "-u", "consumer.py"]
