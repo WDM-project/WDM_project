@@ -331,12 +331,12 @@ def checkout(order_id):
         # wait for the consumer thread to put a message in the queue
         while True:
             try:
-                msg = queue.get(timeout=100)  # wait for 10 seconds
+                msg = queue.get(timeout=1000)  # wait for 10 seconds
                 if msg["status"] == "success":
                     return jsonify({"status": "success"}), 200
                 else:
                     return jsonify({"status": msg["reason"]}), 400
-            except queue.empty():
+            except Exception as e:
                 print("No message received after 10 seconds, retrying...")
                 continue
 
