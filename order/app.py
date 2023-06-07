@@ -7,6 +7,7 @@ import redis
 import json
 from kafka import KafkaProducer
 from kafka import KafkaConsumer
+from kafka import TopicPartition
 from queue import Queue
 from threading import Thread
 import time
@@ -233,7 +234,7 @@ consumer = KafkaConsumer(
     key_deserializer=lambda x: json.loads(x.decode("utf-8")),
 )
 
-consumer.subscribe(["order_result_topic"])
+consumer.assign([TopicPartition("order_result_topic", 0)])
 print("waiting for order result, consumer has subscribed to order_result_topic")
 
 
@@ -301,12 +302,14 @@ def checkout(order_id):
                 "is_roll_back": "false",
             },
             key=global_transaction_id,
+            parition=0,
         )
         # print("sending payment processing message of order_id: ", order_id)
         producer.send(
             "payment_processing_topic",
             value={"order_data": order_data, "action": "pay", "is_roll_back": "false"},
             key=global_transaction_id,
+            parition=0,
         )
 
         # for message in consumer:

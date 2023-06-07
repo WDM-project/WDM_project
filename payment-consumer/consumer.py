@@ -1,4 +1,4 @@
-from kafka import KafkaConsumer, KafkaProducer
+from kafka import KafkaConsumer, KafkaProducer, TopicPartition
 import json
 import os
 import redis
@@ -92,7 +92,7 @@ def cancel_payment(user_id: str, order_id: str):
         pipe.reset()
 
 
-consumer.subscribe(["payment_processing_topic"])
+consumer.assign([TopicPartition("payment_processing_topic", 0)])
 for message in consumer:
     print("Received message in payment consumer")
     msg = message.value
@@ -122,6 +122,7 @@ for message in consumer:
                     "action": "pay",
                     "is_roll_back": msg["is_roll_back"],
                 },
+                partition=0,
             )
             print("Sent success message to payment processing result topic pay")
         else:
@@ -134,6 +135,7 @@ for message in consumer:
                     "action": "pay",
                     "is_roll_back": msg["is_roll_back"],
                 },
+                partition=0,
             )
             print("Sent failure message to payment processing result topic pay")
     elif msg["action"] == "cancel":
@@ -149,6 +151,7 @@ for message in consumer:
                     "action": "cancel",
                     "is_roll_back": msg["is_roll_back"],
                 },
+                partition=0,
             )
             print("Sent success message to payment processing result topic cancel")
         else:
@@ -161,5 +164,6 @@ for message in consumer:
                     "action": "cancel",
                     "is_roll_back": msg["is_roll_back"],
                 },
+                partition=0,
             )
             print("Sent failure message to payment processing result topic cancel")
