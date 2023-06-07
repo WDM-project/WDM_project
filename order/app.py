@@ -336,7 +336,7 @@ def checkout(order_id):
                     return jsonify({"status": "success"}), 200
                 else:
                     return jsonify({"status": msg["reason"]}), 400
-            except queue.Empty:
+            except queue.empty():
                 print("No message received after 10 seconds, retrying...")
                 continue
 
