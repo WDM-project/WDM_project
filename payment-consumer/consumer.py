@@ -89,8 +89,8 @@ def remove_credit(user_id: str, order_id: str, amount: int):
     user_key = f"user:{user_id}"
     order_key = f"order:{order_id}"
 
-    order_data = db_order.hgetall(order_key)
-    print("order data at the start of remove credit function", order_data)
+    # order_data = db_order.hgetall(order_key)
+    # print("order data at the start of remove credit function", order_data)
     pipe_user = db.pipeline(transaction=True)
     pipe_order = db_order.pipeline(transaction=True)
 
@@ -129,9 +129,9 @@ def remove_credit(user_id: str, order_id: str, amount: int):
         # Execute the transactions
         pipe_order.execute()
 
-        # Get the updated order data
-        order_data = db_order.hgetall(order_key)
-        print("order data at the end of remove credit function", order_data)
+        # # Get the updated order data
+        # order_data = db_order.hgetall(order_key)
+        # print("order data at the end of remove credit function", order_data)
         return {"status": "success"}, 200
     except Exception as e:
         return str(e), 500
@@ -154,8 +154,8 @@ def cancel_payment(user_id: str, order_id: str):
         pipe_order.watch(order_key)
         pipe_order.hgetall(order_key)
         result_order = pipe_order.execute()
+        print("result order", result_order)
         order_data = result_order[0]
-
         if not order_data:
             return {"error": "Order not found"}, 400
         print("order data", order_data)
