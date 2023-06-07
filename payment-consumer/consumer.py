@@ -121,7 +121,7 @@ def cancel_payment(user_id: str, order_id: str):
         order_data = result[0]
         if not order_data:
             return {"error": "Order not found"}, 400
-
+        print("order data", order_data)
         if order_data[b"paid"] == b"True":
             total_cost = int(order_data[b"total_cost"])
             pipe.multi()

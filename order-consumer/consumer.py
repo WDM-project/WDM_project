@@ -64,6 +64,9 @@ def process_message(message):
     # if msg["is_roll_back"] == "false" and db.get(f"transaction:{transaction_id}") is None:
     #     db.set(f"transaction:{transaction_id}", 1)
 
+    # TODO !!!
+    # rollback for cancel order disabled, do we need it?
+
     if msg["is_roll_back"] == "true":
         # in case of rollback failure, keep trying to rollback
         print("rollback message received at order-consumer")
