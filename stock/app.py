@@ -2,6 +2,7 @@ import os
 import atexit
 from flask import Flask, jsonify
 import redis
+from kafka import KafkaConsumer, KafkaProducer, TopicPartition
 
 
 app = Flask("stock-service")

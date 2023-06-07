@@ -32,13 +32,31 @@ consumer = KafkaConsumer(
 )
 
 
+def add_credit(user_id: str, amount: int):
+    pipe = db.pipeline(transaction=True)
+    user_key = f"user:{user_id}"
+    try:
+        pipe.watch(user_key)
+        exists = pipe.exists(user_key)
+        if not exists:
+            return {"error": "User not found"}, 400
+        pipe.multi()
+        pipe.hincrby(user_key, "credit", int(amount))
+        pipe.execute()
+        return {"done": True}, 200
+    except Exception as e:
+        return str(e), 500
+    finally:
+        pipe.reset()
+
+
 def remove_credit(user_id: str, order_id: str, amount: int):
     user_key = f"user:{user_id}"
     order_key = f"order:{order_id}"
     pipe = db.pipeline(transaction=True)
     try:
-        # pipe.watch(user_key, order_key)
-        # pipe.multi()
+        pipe.watch(user_key, order_key)
+        pipe.multi()
         pipe.hget(user_key, "credit")
         result = pipe.execute()
         current_credit = result[0]
@@ -69,8 +87,8 @@ def cancel_payment(user_id: str, order_id: str):
     order_key = f"order:{order_id}"
     pipe = db.pipeline(transaction=True)
     try:
-        # pipe.watch(order_key, user_key)
-        # pipe.multi()
+        pipe.watch(order_key, user_key)
+        pipe.multi()
         pipe.hgetall(order_key)
         result = pipe.execute()
         order_data = result[0]
@@ -92,15 +110,12 @@ def cancel_payment(user_id: str, order_id: str):
         pipe.reset()
 
 
-consumer.assign([TopicPartition("payment_processing_topic", 0)])
+consumer.subscribe([TopicPartition(topic="payment_processing_topic", partition=0)])
 for message in consumer:
     print("Received message in payment consumer")
     msg = message.value
     transaction_id = message.key
-    order_data = msg["order_data"]
-    order_id = order_data["order_id"]
-    user_id = order_data["user_id"]
-    total_cost = int(order_data["total_cost"])
+
     print(msg)
     # if msg["is_roll_back"]=="false" and db.get(f"transaction:{transaction_id}"):
     #     print(f"Transaction {transaction_id} has been processed before, skipping...")
@@ -108,62 +123,176 @@ for message in consumer:
     # # If this is not a rollback operation, store the transaction_id in Redis to mark this operation as processed
     # if msg["is_roll_back"] == "false" and db.get(f"transaction:{transaction_id}") is None:
     #     db.set(f"transaction:{transaction_id}", 1)
-    if msg["action"] == "pay":
-        print("Going to remove credit")
-        response, status_code = remove_credit(user_id, order_id, total_cost)
-        print("received response from remove credit", response, status_code)
-        if status_code == 200:
-            producer.send(
-                "payment_processing_result_topic",
-                key=transaction_id,
-                value={
-                    "status": "success",
-                    "order_data": order_data,
-                    "action": "pay",
-                    "is_roll_back": msg["is_roll_back"],
-                },
-                partition=0,
-            )
-            print("Sent success message to payment processing result topic pay")
-        else:
-            producer.send(
-                "payment_processing_result_topic",
-                key=transaction_id,
-                value={
-                    "status": "failure",
-                    "order_data": order_data,
-                    "action": "pay",
-                    "is_roll_back": msg["is_roll_back"],
-                },
-                partition=0,
-            )
-            print("Sent failure message to payment processing result topic pay")
-    elif msg["action"] == "cancel":
-        response, status_code = cancel_payment(user_id, order_id)
-        print("received response from cancel payment", response, status_code)
-        if status_code == 200:
-            producer.send(
-                "payment_processing_result_topic",
-                key=transaction_id,
-                value={
-                    "status": "success",
-                    "order_data": order_data,
-                    "action": "cancel",
-                    "is_roll_back": msg["is_roll_back"],
-                },
-                partition=0,
-            )
-            print("Sent success message to payment processing result topic cancel")
-        else:
-            producer.send(
-                "payment_processing_result_topic",
-                key=transaction_id,
-                value={
-                    "status": "failure",
-                    "order_data": order_data,
-                    "action": "cancel",
-                    "is_roll_back": msg["is_roll_back"],
-                },
-                partition=0,
-            )
-            print("Sent failure message to payment processing result topic cancel")
+    if msg["callFrom"] == "checkout":
+        order_data = msg["order_data"]
+        order_id = order_data["order_id"]
+        user_id = order_data["user_id"]
+        total_cost = int(order_data["total_cost"])
+        if msg["action"] == "pay":
+            print("Going to remove credit")
+            response, status_code = remove_credit(user_id, order_id, total_cost)
+            print("received response from remove credit", response, status_code)
+            if status_code == 200:
+                producer.send(
+                    "payment_processing_result_topic",
+                    key=transaction_id,
+                    value={
+                        "status": "success",
+                        "order_data": order_data,
+                        "action": "pay",
+                        "is_roll_back": msg["is_roll_back"],
+                    },
+                    partition=0,
+                )
+                print("Sent success message to payment processing result topic pay")
+            else:
+                producer.send(
+                    "payment_processing_result_topic",
+                    key=transaction_id,
+                    value={
+                        "status": "failure",
+                        "order_data": order_data,
+                        "action": "pay",
+                        "is_roll_back": msg["is_roll_back"],
+                    },
+                    partition=0,
+                )
+                print("Sent failure message to payment processing result topic pay")
+        elif msg["action"] == "cancel":
+            response, status_code = cancel_payment(user_id, order_id)
+            print("received response from cancel payment", response, status_code)
+            if status_code == 200:
+                producer.send(
+                    "payment_processing_result_topic",
+                    key=transaction_id,
+                    value={
+                        "status": "success",
+                        "order_data": order_data,
+                        "action": "cancel",
+                        "is_roll_back": msg["is_roll_back"],
+                    },
+                    partition=0,
+                )
+                print("Sent success message to payment processing result topic cancel")
+            else:
+                producer.send(
+                    "payment_processing_result_topic",
+                    key=transaction_id,
+                    value={
+                        "status": "failure",
+                        "order_data": order_data,
+                        "action": "cancel",
+                        "is_roll_back": msg["is_roll_back"],
+                    },
+                    partition=0,
+                )
+                print("Sent failure message to payment processing result topic cancel")
+    else:
+        if msg["action"] == "add_credit":
+            user_id = msg["user_id"]
+            amount = int(msg["amount"])
+            response, status_code = add_credit(user_id, amount)
+            print("received response from add credit", response, status_code)
+            if status_code == 200:
+                producer.send(
+                    "payment_processing_result_topic",
+                    key=transaction_id,
+                    value={
+                        "status": "success",
+                        "user_id": user_id,
+                        "amount": amount,
+                        "action": "add_credit",
+                        "is_roll_back": msg["is_roll_back"],
+                    },
+                    partition=1,
+                )
+                print(
+                    "Sent success message to payment processing result topic add_credit"
+                )
+            else:
+                producer.send(
+                    "payment_processing_result_topic",
+                    key=transaction_id,
+                    value={
+                        "status": "failure",
+                        "user_id": user_id,
+                        "amount": amount,
+                        "action": "add_credit",
+                        "is_roll_back": msg["is_roll_back"],
+                    },
+                    partition=1,
+                )
+                print(
+                    "Sent failure message to payment processing result topic add_credit"
+                )
+        elif msg["action"] == "pay":
+            user_id = msg["user_id"]
+            order_id = msg["order_id"]
+            amount = int(msg["amount"])
+            response, status_code = remove_credit(user_id, order_id, amount)
+            print("received response from remove credit", response, status_code)
+            if status_code == 200:
+                producer.send(
+                    "payment_processing_result_topic",
+                    key=transaction_id,
+                    value={
+                        "status": "success",
+                        "user_id": user_id,
+                        "order_id": order_id,
+                        "amount": amount,
+                        "action": "pay",
+                        "is_roll_back": msg["is_roll_back"],
+                    },
+                    partition=1,
+                )
+                print("Sent success message to payment processing result topic pay from payment")
+            else:
+                producer.send(
+                    "payment_processing_result_topic",
+                    key=transaction_id,
+                    value={
+                        "status": "failure",
+                        "user_id": user_id,
+                        "order_id": order_id,
+                        "amount": amount,
+                        "action": "pay",
+                        "is_roll_back": msg["is_roll_back"],
+                    },
+                    partition=1,
+                )
+                print("Sent failure message to payment processing result topic pay from payment")
+        elif msg["action"] == "cancel":
+            user_id = msg["user_id"]
+            order_id = msg["order_id"]
+            response, status_code = cancel_payment(user_id, order_id)
+            print("received response from cancel payment", response, status_code)
+            if status_code == 200:
+                producer.send(
+                    "payment_processing_result_topic",
+                    key=transaction_id,
+                    value={
+                        "status": "success",
+                        "user_id": user_id,
+                        "order_id": order_id,
+                        "action": "cancel",
+                        "is_roll_back": msg["is_roll_back"],
+                    },
+                    partition=1,
+                )
+                print("Sent success message to payment processing result topic cancel from payment")
+            else:
+                producer.send(
+                    "payment_processing_result_topic",
+                    key=transaction_id,
+                    value={
+                        "status": "failure",
+                        "user_id": user_id,
+                        "order_id": order_id,
+                        "action": "cancel",
+                        "is_roll_back": msg["is_roll_back"],
+                    },
+                    partition=1,
+                )
+                print("Sent failure message to payment processing result topic cancel from payment")
+
+

@@ -30,6 +30,42 @@ consumer = KafkaConsumer(
 )
 
 
+def add_stock(item_id: str, amount: int):
+    item_key = f"item:{item_id}"
+    pipe = db.pipeline(transaction=True)
+    try:
+        pipe.exists(item_key)
+        pipe.hincrby(item_key, "stock", int(amount))
+        result = pipe.execute()
+        if not result[0]:  # check the result of the EXISTS command
+            return {"error": "Item not found"}, 400
+        return {"done": True}, 200
+    except Exception as e:
+        return str(e), 500
+    finally:
+        pipe.reset()
+
+
+def remove_stock(item_id: str, amount: int):
+    item_key = f"item:{item_id}"
+    pipe = db.pipeline(transaction=True)
+    try:
+        pipe.exists(item_key)
+        pipe.hget(item_key, "stock")
+        result = pipe.execute()
+        if not result[0]:  # check the result of the EXISTS command
+            return {"error": "Item not found"}, 400
+        current_stock = int(result[1])  # get the current stock
+        if current_stock < int(amount):
+            return {"error": "Insufficient stock"}, 400
+        db.hincrby(item_key, "stock", -int(amount))  # subtract from the stock
+        return {"done": True}, 200
+    except Exception as e:
+        return str(e), 500
+    finally:
+        pipe.reset()
+
+
 def modify_stock_list(items: list, amount: int):
     print("in modify stock list function line 32", items, amount)
     pipe = db.pipeline(transaction=True)
