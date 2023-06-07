@@ -6,29 +6,6 @@ from kafka import KafkaConsumer, KafkaProducer, TopicPartition
 import json
 import uuid
 
-from kafka import KafkaAdminClient
-from kafka.admin import NewPartitions
-
-
-def create_partitions():
-    bootstrap_servers = "kafka-service:9092"
-    admin_client = KafkaAdminClient(bootstrap_servers=bootstrap_servers)
-
-    topics = ["payment_processing_result_topic"]  # List your topics here
-    partition_count = 2  # Number of partitions to be created for each topic
-
-    topic_partitions = {
-        topic: NewPartitions(total_count=partition_count) for topic in topics
-    }
-
-    try:
-        admin_client.create_partitions(topic_partitions)
-        print("Partitions created successfully.")
-    except Exception as e:
-        print(f"Failed to create partitions: {str(e)}")
-
-
-create_partitions()
 
 app = Flask("payment-service")
 

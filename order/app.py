@@ -300,6 +300,7 @@ def checkout(order_id):
                 "affected_items": list_data,
                 "action": "remove",
                 "is_roll_back": "false",
+                "callFrom": "checkout",
             },
             key=global_transaction_id,
             partition=0,
