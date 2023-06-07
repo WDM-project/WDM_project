@@ -1,4 +1,4 @@
-from kafka import KafkaConsumer, KafkaProducer
+from kafka import KafkaConsumer, KafkaProducer, TopicPartition
 import json
 import os
 import redis
@@ -67,7 +67,7 @@ def modify_stock_list(items: list, amount: int):
         pipe.reset()
 
 
-consumer.subscribe(["stock_check_topic"])
+consumer.subscribe([TopicPartition(topic="stock_check_topic", partition=0)])
 for message in consumer:
     print("stock consumer received message")
     msg = message.value
@@ -97,6 +97,7 @@ for message in consumer:
                     "is_roll_back": msg["is_roll_back"],
                     "action": "add",
                 },
+                partition=0,
             )
             print("send failure message to stock_check_result_topic")
         else:
@@ -109,6 +110,7 @@ for message in consumer:
                     "is_roll_back": msg["is_roll_back"],
                     "action": "add",
                 },
+                partition=0,
             )
             print("send success message to stock_check_result_topic")
         # reverse_items.append(item_id)
@@ -125,6 +127,7 @@ for message in consumer:
                     "is_roll_back": msg["is_roll_back"],
                     "action": "remove",
                 },
+                partition=0,
             )
             print("send failure message to stock_check_result_topic remove")
         else:
@@ -137,6 +140,7 @@ for message in consumer:
                     "is_roll_back": msg["is_roll_back"],
                     "action": "remove",
                 },
+                partition=0,
             )
             print("send success message to stock_check_result_topic remove")
         # reverse_items.append(item_id)
