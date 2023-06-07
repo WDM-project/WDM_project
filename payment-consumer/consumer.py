@@ -2,7 +2,7 @@ from kafka import KafkaConsumer, KafkaProducer, TopicPartition
 import json
 import os
 import redis
-from flask import Flask, jsonify
+# from flask import Flask, jsonify
 
 # app = Flask("payment-consumer-service")
 
