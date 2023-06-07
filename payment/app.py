@@ -121,6 +121,7 @@ def add_credit(user_id: str, amount: int):
         partition=0,
     )
     for message in consumer:
+        print(message, "recevied at payment service")
         msg = message.value
         if message.key == ida:
             if msg["status"] == "success":
@@ -146,6 +147,7 @@ def remove_credit(user_id: str, order_id: str, amount: int):
         partition=0,
     )
     for message in consumer:
+        print(message, "recevied at payment service")
         msg = message.value
         if message.key == idr:
             if msg["status"] == "success":

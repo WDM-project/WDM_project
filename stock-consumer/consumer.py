@@ -105,7 +105,7 @@ def modify_stock_list(items: list, amount: int):
 
 consumer.assign([TopicPartition("stock_check_topic", 0)])
 for message in consumer:
-    print("stock consumer received message")
+    print("stock consumer received message", message)
     msg = message.value
     transaction_id = message.key
     affected_items = msg["affected_items"]
