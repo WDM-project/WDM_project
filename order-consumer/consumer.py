@@ -150,7 +150,7 @@ def process_message(message):
                     producer.send(
                         "order_result_topic",
                         key=transaction_id,
-                        value={"status": "success"},
+                        value={"status": "success", "reason": "order placed"},
                         partition=0,
                     )
                 elif (
@@ -163,7 +163,10 @@ def process_message(message):
                     producer.send(
                         "order_result_topic",
                         key=transaction_id,
-                        value={"status": "failure"},
+                        value={
+                            "status": "failure",
+                            "reason": "payment and stock both fails",
+                        },
                         partition=0,
                     )
                 elif (
@@ -176,7 +179,7 @@ def process_message(message):
                     producer.send(
                         "order_result_topic",
                         key=transaction_id,
-                        value={"status": "failure"},
+                        value={"status": "failure", "reason": "stock check fails"},
                         partition=0,
                     )
                     # send the rollback message to the payment_processing_topic
@@ -219,7 +222,7 @@ def process_message(message):
                     producer.send(
                         "order_result_topic",
                         key=transaction_id,
-                        value={"status": "failure"},
+                        value={"status": "failure", "reason": "payment fails"},
                         partition=0,
                     )
                     # send the rollback message to the stock_check_topic
@@ -283,7 +286,7 @@ def process_message(message):
                     producer.send(
                         "order_result_topic",
                         key=transaction_id,
-                        value={"status": "success"},
+                        value={"status": "success", "reason": "both success"},
                         partition=0,
                     )
                 elif (
@@ -296,7 +299,7 @@ def process_message(message):
                     producer.send(
                         "order_result_topic",
                         key=transaction_id,
-                        value={"status": "failure"},
+                        value={"status": "failure", "reason": "both fails"},
                         partition=0,
                     )
                 elif (
@@ -309,7 +312,7 @@ def process_message(message):
                     producer.send(
                         "order_result_topic",
                         key=transaction_id,
-                        value={"status": "failure"},
+                        value={"status": "failure", "reason": "stock check fails"},
                         partition=0,
                     )
                     # send the rollback message to the payment_processing_topic
@@ -352,7 +355,7 @@ def process_message(message):
                     producer.send(
                         "order_result_topic",
                         key=transaction_id,
-                        value={"status": "failure"},
+                        value={"status": "failure", "reason": "payment fails"},
                         partition=0,
                     )
                     # send the rollback message to the stock_check_topic
