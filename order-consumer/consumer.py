@@ -78,6 +78,7 @@ def process_message(message):
                             "affected_items": msg["affected_items"],
                             "action": "add",
                             "is_roll_back": "true",
+                            "callFrom": "checkout",
                         },
                         partition=0,
                     )
@@ -89,6 +90,7 @@ def process_message(message):
                             "affected_items": msg["affected_items"],
                             "action": "remove",
                             "is_roll_back": "true",
+                            "callFrom": "checkout",
                         },
                         partition=0,
                     )
@@ -101,6 +103,7 @@ def process_message(message):
                             "order_data": msg["order_data"],
                             "action": "pay",
                             "is_roll_back": "true",
+                            "callFrom": "checkout",
                         },
                         partition=0,
                     )
@@ -112,6 +115,7 @@ def process_message(message):
                             "order_data": msg["order_data"],
                             "action": "cancel",
                             "is_roll_back": "true",
+                            "callFrom": "checkout",
                         },
                         partition=0,
                     )
@@ -192,6 +196,7 @@ def process_message(message):
                                 "order_data": temp_msg["order_data"],
                                 "action": "cancel",
                                 "is_roll_back": "true",
+                                "callFrom": "checkout",
                             },
                             partition=0,
                         )
@@ -206,6 +211,7 @@ def process_message(message):
                                 "order_data": temp_msg["order_data"],
                                 "action": "pay",
                                 "is_roll_back": "true",
+                                "callFrom": "checkout",
                             },
                             partition=0,
                         )
@@ -235,6 +241,7 @@ def process_message(message):
                                 "affected_items": temp_msg["affected_items"],
                                 "action": "remove",
                                 "is_roll_back": "true",
+                                "callFrom": "checkout",
                             },
                             partition=0,
                         )
@@ -249,6 +256,7 @@ def process_message(message):
                                 "affected_items": temp_msg["affected_items"],
                                 "action": "add",
                                 "is_roll_back": "true",
+                                "callFrom": "checkout",
                             },
                             partition=0,
                         )
@@ -325,6 +333,7 @@ def process_message(message):
                                 "order_data": temp_msg["order_data"],
                                 "action": "cancel",
                                 "is_roll_back": "true",
+                                "callFrom": "checkout",
                             },
                             partition=0,
                         )
@@ -339,6 +348,7 @@ def process_message(message):
                                 "order_data": temp_msg["order_data"],
                                 "action": "pay",
                                 "is_roll_back": "true",
+                                "callFrom": "checkout",
                             },
                             partition=0,
                         )
@@ -368,6 +378,7 @@ def process_message(message):
                                 "affected_items": temp_msg["affected_items"],
                                 "action": "remove",
                                 "is_roll_back": "true",
+                                "callFrom": "checkout",
                             },
                             partition=0,
                         )
@@ -382,6 +393,7 @@ def process_message(message):
                                 "affected_items": temp_msg["affected_items"],
                                 "action": "add",
                                 "is_roll_back": "true",
+                                "callFrom": "checkout",
                             },
                             partition=0,
                         )
