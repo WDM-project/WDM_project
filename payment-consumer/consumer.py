@@ -4,8 +4,7 @@ import os
 import redis
 from redlock import Redlock
 
-# from flask import Flask, jsonify
-
+# from flask import Flask,
 # app = Flask("payment-consumer-service")
 
 
@@ -44,64 +43,69 @@ consumer = KafkaConsumer(
 )
 
 
+@app.post("/pay/<user_id>/<order_id>/<amount>")
 def remove_credit(user_id: str, order_id: str, amount: int):
-    user_key = f"user:{user_id}"
-    order_key = f"order:{order_id}"
-    pipe = db.pipeline(transaction=True)
-    try:
-        pipe.watch(user_key, order_key)
-        pipe.multi()
-        pipe.hget(user_key, "credit")
-        result = pipe.execute()
-        current_credit = result[0]
-        current_credit = int(current_credit)
-        print(
-            "current credit",
-            current_credit,
-            "orderid",
-            order_id,
-            "in line 44 of payment consumer",
-        )
-        if current_credit < int(amount):
-            return {"error": "Insufficient credit"}, 400
+    my_lock = d.lock("paymentLock", 1000)
+    while True:
+        if my_lock:
+            user_key = f"user:{user_id}"
+            order_key = f"order:{order_id}"
+            pipe = db.pipeline(transaction=True)
+            try:
+                pipe.watch(user_key, order_key)
+                pipe.multi()
+                pipe.hget(user_key, "credit")
+                result = pipe.execute()
+                current_credit = result[0]
+                current_credit = int(current_credit)
+                if current_credit < int(amount):
+                    return {"error": "Insufficient credit"}, 400
 
-        pipe.multi()
-        pipe.hincrby(user_key, "credit", -int(amount))
-        pipe.hset(order_key, "paid", "True")
-        pipe.execute()
-        return {"status": "success"}, 200
-    except Exception as e:
-        return str(e), 500
-    finally:
-        pipe.reset()
-
-
-def cancel_payment(user_id: str, order_id: str):
-    user_key = f"user:{user_id}"
-    order_key = f"order:{order_id}"
-    pipe = db.pipeline(transaction=True)
-    try:
-        pipe.watch(order_key, user_key)
-        pipe.multi()
-        pipe.hgetall(order_key)
-        result = pipe.execute()
-        order_data = result[0]
-        if not order_data:
-            return {"error": "Order not found"}, 400
-
-        if order_data[b"paid"] == b"True":
-            total_cost = int(order_data[b"total_cost"])
-            pipe.multi()
-            pipe.hset(order_key, "paid", "False")
-            pipe.hincrby(user_key, "credit", total_cost)
-            pipe.execute()
-            return {"status": "success"}, 200
+                pipe.multi()
+                pipe.hincrby(user_key, "credit", -int(amount))
+                pipe.hset(order_key, "paid", "True")
+                pipe.execute()
+                return {"status": "success"}, 200
+            except Exception as e:
+                return str(e), 500
+            finally:
+                pipe.reset()
+                d.unlock(my_lock)
         else:
-            return {"error": "Payment already cancelled"}, 400
-    except Exception as e:
-        return str(e), 500
-    finally:
-        pipe.reset()
+            print("Lock not acquired, retrying...")
+
+
+@app.post("/cancel/<user_id>/<order_id>")
+def cancel_payment(user_id: str, order_id: str):
+    my_lock = d.lock("paymentLock", 1000)
+    while True:
+        if my_lock:
+            user_key = f"user:{user_id}"
+            order_key = f"order:{order_id}"
+            pipe = db.pipeline(transaction=True)
+            try:
+                pipe.watch(order_key, user_key)
+                pipe.multi()
+                pipe.hgetall(order_key)
+                result = pipe.execute()
+                order_data = result[0]
+                if not order_data:
+                    return {"error": "Order not found"}, 400
+
+                if order_data[b"paid"] == b"True":
+                    total_cost = int(order_data[b"total_cost"])
+                    pipe.multi()
+                    pipe.hset(order_key, "paid", "False")
+                    pipe.hincrby(user_key, "credit", total_cost)
+                    pipe.execute()
+                    return {"status": "success"}, 200
+                else:
+                    return {"error": "Payment already cancelled"}, 400
+            except Exception as e:
+                return str(e), 500
+            finally:
+                pipe.reset()
+                d.unlock(my_lock)
 
 
 consumer.assign([TopicPartition("payment_processing_topic", 0)])

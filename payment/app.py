@@ -2,6 +2,7 @@ import os
 import atexit
 from flask import Flask, jsonify
 import redis
+from redlock import Redlock
 
 
 app = Flask("payment-service")
@@ -11,6 +12,17 @@ db: redis.Redis = redis.Redis(
     port=int(os.environ["REDIS_PORT"]),
     password=os.environ["REDIS_PASSWORD"],
     db=int(os.environ["REDIS_DB"]),
+)
+
+d = Redlock(
+    [
+        {
+            "host": os.environ["REDIS_HOST"],
+            "port": int(os.environ["REDIS_PORT"]),
+            "password": os.environ["REDIS_PASSWORD"],
+            "db": int(os.environ["REDIS_DB"]),
+        },
+    ]
 )
 
 
@@ -40,6 +52,7 @@ def create_user_init():
     finally:
         pipe.reset()
 
+
 @app.post("/create_user/<user_id>")
 def create_user(user_id):
     pipe = db.pipeline(transaction=True)
@@ -47,7 +60,7 @@ def create_user(user_id):
         # pipe.incr("user_id")
         # result = pipe.execute()  # The result of the INCR command is stored in `result`
         # user_id = result[
-            # 0
+        # 0
         # ]  # The result of the INCR command is the first element of `result`
         user_key = f"user:{user_id}"
         pipe.multi()
@@ -58,6 +71,7 @@ def create_user(user_id):
         return str(e), 500
     finally:
         pipe.reset()
+
 
 @app.get("/find_user/<user_id>")
 def find_user(user_id: str):
@@ -102,57 +116,67 @@ def add_credit(user_id: str, amount: int):
 
 @app.post("/pay/<user_id>/<order_id>/<amount>")
 def remove_credit(user_id: str, order_id: str, amount: int):
-    user_key = f"user:{user_id}"
-    order_key = f"order:{order_id}"
-    pipe = db.pipeline(transaction=True)
-    try:
-        pipe.watch(user_key, order_key)
-        pipe.multi()
-        pipe.hget(user_key, "credit")
-        result = pipe.execute()
-        current_credit = result[0]
-        current_credit = int(current_credit)
-        if current_credit < int(amount):
-            return jsonify({"error": "Insufficient credit"}), 400
+    my_lock = d.lock("paymentLock", 1000)
+    while True:
+        if my_lock:
+            user_key = f"user:{user_id}"
+            order_key = f"order:{order_id}"
+            pipe = db.pipeline(transaction=True)
+            try:
+                pipe.watch(user_key, order_key)
+                pipe.multi()
+                pipe.hget(user_key, "credit")
+                result = pipe.execute()
+                current_credit = result[0]
+                current_credit = int(current_credit)
+                if current_credit < int(amount):
+                    return jsonify({"error": "Insufficient credit"}), 400
 
-        pipe.multi()
-        pipe.hincrby(user_key, "credit", -int(amount))
-        pipe.hset(order_key, "paid", "True")
-        pipe.execute()
-        return jsonify({"status": "success"}), 200
-    except Exception as e:
-        return str(e), 500
-    finally:
-        pipe.reset()
+                pipe.multi()
+                pipe.hincrby(user_key, "credit", -int(amount))
+                pipe.hset(order_key, "paid", "True")
+                pipe.execute()
+                return jsonify({"status": "success"}), 200
+            except Exception as e:
+                return str(e), 500
+            finally:
+                pipe.reset()
+                d.unlock(my_lock)
+        else:
+            print("Lock not acquired, retrying...")
 
 
 @app.post("/cancel/<user_id>/<order_id>")
 def cancel_payment(user_id: str, order_id: str):
-    user_key = f"user:{user_id}"
-    order_key = f"order:{order_id}"
-    pipe = db.pipeline(transaction=True)
-    try:
-        pipe.watch(order_key, user_key)
-        pipe.multi()
-        pipe.hgetall(order_key)
-        result = pipe.execute()
-        order_data = result[0]
-        if not order_data:
-            return jsonify({"error": "Order not found"}), 400
+    my_lock = d.lock("paymentLock", 1000)
+    while True:
+        if my_lock:
+            user_key = f"user:{user_id}"
+            order_key = f"order:{order_id}"
+            pipe = db.pipeline(transaction=True)
+            try:
+                pipe.watch(order_key, user_key)
+                pipe.multi()
+                pipe.hgetall(order_key)
+                result = pipe.execute()
+                order_data = result[0]
+                if not order_data:
+                    return jsonify({"error": "Order not found"}), 400
 
-        if order_data[b"paid"] == b"True":
-            total_cost = int(order_data[b"total_cost"])
-            pipe.multi()
-            pipe.hset(order_key, "paid", "False")
-            pipe.hincrby(user_key, "credit", total_cost)
-            pipe.execute()
-            return jsonify({"status": "success"}), 200
-        else:
-            return jsonify({"error": "Payment already cancelled"}), 400
-    except Exception as e:
-        return str(e), 500
-    finally:
-        pipe.reset()
+                if order_data[b"paid"] == b"True":
+                    total_cost = int(order_data[b"total_cost"])
+                    pipe.multi()
+                    pipe.hset(order_key, "paid", "False")
+                    pipe.hincrby(user_key, "credit", total_cost)
+                    pipe.execute()
+                    return jsonify({"status": "success"}), 200
+                else:
+                    return jsonify({"error": "Payment already cancelled"}), 400
+            except Exception as e:
+                return str(e), 500
+            finally:
+                pipe.reset()
+                d.unlock(my_lock)
 
 
 @app.get("/status/<user_id>/<order_id>")
