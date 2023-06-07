@@ -312,21 +312,21 @@ def checkout(order_id):
             parition=0,
         )
 
-        # for message in consumer:
-        #     print("unpack message result in line 312", message)
-        #     if message.key == global_transaction_id:
-        #         msg = message.value
-        #         if msg["status"] == "success":
-        #             return jsonify({"status": "success"}), 200
-        #         else:
-        #             return jsonify({"error": "Payment failed"}), 400
-        # return jsonify({"error": "Wait too long, quit"}), 400
+        for message in consumer:
+            print("unpack message result in line 312", message)
+            if message.key == global_transaction_id:
+                msg = message.value
+                if msg["status"] == "success":
+                    return jsonify({"status": "success"}), 200
+                else:
+                    return jsonify({"error": "Payment failed"}), 400
+        return jsonify({"error": "Wait too long, quit"}), 400
 
-        queue = Queue()
-        consumer_thread = Thread(
-            target=kafka_consumer_thread, args=(consumer, queue, global_transaction_id)
-        )
-        consumer_thread.start()
+        # queue = Queue()
+        # consumer_thread = Thread(
+        #     target=kafka_consumer_thread, args=(consumer, queue, global_transaction_id)
+        # )
+        # consumer_thread.start()
 
         # wait for the consumer thread to put a message in the queue
         while True:
