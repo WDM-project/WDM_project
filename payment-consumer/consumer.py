@@ -80,21 +80,10 @@ def add_credit(user_id: str, amount: int):
 def remove_credit(user_id: str, order_id: str, amount: int):
     user_key = f"user:{user_id}"
     order_key = f"order:{order_id}"
-    pipe = db.pipeline(transaction=True)
+    pipe = db.pipeline(transaction=False)
     try:
         pipe.watch(user_key, order_key)
-        pipe.multi()
-        pipe.hget(user_key, "credit")
-        result = pipe.execute()
-        current_credit = result[0]
-        current_credit = int(current_credit)
-        print(
-            "current credit",
-            current_credit,
-            "orderid",
-            order_id,
-            "in line 44 of payment consumer",
-        )
+        current_credit = int(pipe.hget(user_key, "credit"))
         if current_credit < int(amount):
             return {"error": "Insufficient credit"}, 400
 
