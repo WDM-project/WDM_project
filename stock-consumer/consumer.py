@@ -66,7 +66,7 @@ def modify_stock_list(items: list, amount: int):
         return str(e), 500
 
 
-consumer.subscribe([TopicPartition("stock_check_topic", 0)])
+consumer.assign([TopicPartition("stock_check_topic", 0)])
 for message in consumer:
     print("stock consumer received message")
     msg = message.value
