@@ -101,8 +101,6 @@ def remove_credit(user_id: str, order_id: str, amount: int):
 
         # Start a transaction for each connection
         pipe_user.multi()
-        pipe_order.multi()
-
         # Get the current credit
         pipe_user.hget(user_key, "credit")
         result_user = pipe_user.execute()
@@ -120,14 +118,15 @@ def remove_credit(user_id: str, order_id: str, amount: int):
 
         # Start another transaction for each connection
         pipe_user.multi()
+        pipe_user.hincrby(user_key, "credit", -int(amount))
+        pipe_user.execute()
+
         pipe_order.multi()
 
         # Decrease the credit and set the order as paid
-        pipe_user.hincrby(user_key, "credit", -int(amount))
         pipe_order.hset(order_key, "paid", "True")
 
         # Execute the transactions
-        pipe_user.execute()
         pipe_order.execute()
 
         # Get the updated order data
@@ -145,29 +144,40 @@ def remove_credit(user_id: str, order_id: str, amount: int):
 def cancel_payment(user_id: str, order_id: str):
     user_key = f"user:{user_id}"
     order_key = f"order:{order_id}"
-    pipe = db.pipeline(transaction=True)
+
+    # Initialize a pipeline for each connection
+    pipe_user = db.pipeline(transaction=True)
+    pipe_order = db_order.pipeline(transaction=True)
+
     try:
-        pipe.watch(order_key, user_key)
-        pipe.multi()
-        pipe.hgetall(order_key)
-        result = pipe.execute()
-        order_data = result[0]
+        pipe_user.watch(user_key)
+        pipe_order.watch(order_key)
+        pipe_order.hgetall(order_key)
+        result_order = pipe_order.execute()
+        order_data = result_order[0]
+
         if not order_data:
             return {"error": "Order not found"}, 400
         print("order data", order_data)
         if order_data[b"paid"] == b"True":
             total_cost = int(order_data[b"total_cost"])
-            pipe.multi()
-            pipe.hset(order_key, "paid", "False")
-            pipe.hincrby(user_key, "credit", total_cost)
-            pipe.execute()
+            # Start a transaction for each connection
+            pipe_user.multi()
+            pipe_user.hincrby(user_key, "credit", total_cost)
+            pipe_user.execute()
+
+            pipe_order.multi()
+            pipe_order.hset(order_key, "paid", "False")
+            pipe_order.execute()
+
             return {"status": "success"}, 200
         else:
             return {"error": "Payment already cancelled"}, 400
     except Exception as e:
         return str(e), 500
     finally:
-        pipe.reset()
+        pipe_order.reset()
+        pipe_user.reset()
 
 
 consumer.assign([TopicPartition("payment_processing_topic", 0)])
