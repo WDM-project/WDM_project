@@ -37,8 +37,8 @@ def remove_credit(user_id: str, order_id: str, amount: int):
     order_key = f"order:{order_id}"
     pipe = db.pipeline(transaction=True)
     try:
-        pipe.watch(user_key, order_key)
-        pipe.multi()
+        # pipe.watch(user_key, order_key)
+        # pipe.multi()
         pipe.hget(user_key, "credit")
         result = pipe.execute()
         current_credit = result[0]
@@ -69,8 +69,8 @@ def cancel_payment(user_id: str, order_id: str):
     order_key = f"order:{order_id}"
     pipe = db.pipeline(transaction=True)
     try:
-        pipe.watch(order_key, user_key)
-        pipe.multi()
+        # pipe.watch(order_key, user_key)
+        # pipe.multi()
         pipe.hgetall(order_key)
         result = pipe.execute()
         order_data = result[0]
