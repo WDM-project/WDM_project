@@ -110,7 +110,7 @@ def cancel_payment(user_id: str, order_id: str):
         pipe.reset()
 
 
-consumer.subscribe([TopicPartition(topic="payment_processing_topic", partition=0)])
+consumer.assign([TopicPartition("payment_processing_topic", 0)])
 for message in consumer:
     print("Received message in payment consumer")
     msg = message.value
@@ -245,7 +245,9 @@ for message in consumer:
                     },
                     partition=1,
                 )
-                print("Sent success message to payment processing result topic pay from payment")
+                print(
+                    "Sent success message to payment processing result topic pay from payment"
+                )
             else:
                 producer.send(
                     "payment_processing_result_topic",
@@ -260,7 +262,9 @@ for message in consumer:
                     },
                     partition=1,
                 )
-                print("Sent failure message to payment processing result topic pay from payment")
+                print(
+                    "Sent failure message to payment processing result topic pay from payment"
+                )
         elif msg["action"] == "cancel":
             user_id = msg["user_id"]
             order_id = msg["order_id"]
@@ -279,7 +283,9 @@ for message in consumer:
                     },
                     partition=1,
                 )
-                print("Sent success message to payment processing result topic cancel from payment")
+                print(
+                    "Sent success message to payment processing result topic cancel from payment"
+                )
             else:
                 producer.send(
                     "payment_processing_result_topic",
@@ -293,6 +299,6 @@ for message in consumer:
                     },
                     partition=1,
                 )
-                print("Sent failure message to payment processing result topic cancel from payment")
-
-
+                print(
+                    "Sent failure message to payment processing result topic cancel from payment"
+                )
