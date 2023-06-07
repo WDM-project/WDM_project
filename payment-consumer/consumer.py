@@ -81,6 +81,9 @@ def remove_credit(user_id: str, order_id: str, amount: int):
     user_key = f"user:{user_id}"
     order_key = f"order:{order_id}"
     pipe = db.pipeline(transaction=True)
+
+    order_data = db.hgetall(order_key)
+    print("order data at the start of remove credit function", order_data)
     try:
         pipe.watch(user_key, order_key)
         pipe.multi()
