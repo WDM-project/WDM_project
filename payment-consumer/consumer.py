@@ -3,12 +3,9 @@ import json
 import os
 import redis
 
-# from flask import Flask, jsonify
-
-# app = Flask("payment-consumer-service")
-
 from kafka import KafkaAdminClient
 from kafka.admin import NewPartitions
+import threading
 
 
 def create_partitions():
@@ -180,7 +177,7 @@ def cancel_payment(user_id: str, order_id: str):
 
 
 consumer.assign([TopicPartition("payment_processing_topic", 0)])
-for message in consumer:
+def process_message(message):
     print("Received message in payment consumer")
     msg = message.value
     transaction_id = message.key
@@ -371,3 +368,5 @@ for message in consumer:
                 print(
                     "Sent failure message to payment processing result topic cancel from payment"
                 )
+for message in consumer:
+    threading.Thread(target=process_message, args=(message,)).start()
