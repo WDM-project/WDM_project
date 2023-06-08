@@ -35,8 +35,7 @@ spec:
             requests:
               memory: "0.5Gi"
               cpu: "1"
-          command: ["gunicorn"]
-          args: ["./wait-for-kafka.sh","-b", "0.0.0.0:5000", "app:app"]
+          command: ["./wait-for-kafka.sh", "gunicorn", "-b", "0.0.0.0:5000", "app:app", "-w", "1", "--timeout", "10"]
           ports:
             - containerPort: 5000
           env:
