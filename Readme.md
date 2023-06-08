@@ -41,7 +41,13 @@ Below is the Kafka architecture of our project:
 
 ## 2. Test Instructions of Consistency Test
 
-Run script `run_consistency_test.py`
+deploy docker 
+
+`docker-compose up --build`
+
+Run script 
+
+`run_consistency_test.py`
 
 
 ### Current Issues
