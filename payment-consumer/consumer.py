@@ -44,7 +44,7 @@ db: redis.Redis = redis.Redis(
 
 
 db_order: redis.Redis = redis.Redis(
-    host="order-db",
+    host=os.environ["ORDER_HOST"],
     port=int("6379"),
     password="redis",
     db=int("0"),
