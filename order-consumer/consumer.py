@@ -64,6 +64,9 @@ def process_message(message):
     # if msg["is_roll_back"] == "false" and db.get(f"transaction:{transaction_id}") is None:
     #     db.set(f"transaction:{transaction_id}", 1)
 
+    # TODO !!!
+    # rollback for cancel order disabled, do we need it?
+
     if msg["is_roll_back"] == "true":
         # in case of rollback failure, keep trying to rollback
         print("rollback message received at order-consumer")
@@ -78,6 +81,7 @@ def process_message(message):
                             "affected_items": msg["affected_items"],
                             "action": "add",
                             "is_roll_back": "true",
+                            "callFrom": "checkout",
                         },
                         partition=0,
                     )
@@ -89,6 +93,7 @@ def process_message(message):
                             "affected_items": msg["affected_items"],
                             "action": "remove",
                             "is_roll_back": "true",
+                            "callFrom": "checkout",
                         },
                         partition=0,
                     )
@@ -101,6 +106,7 @@ def process_message(message):
                             "order_data": msg["order_data"],
                             "action": "pay",
                             "is_roll_back": "true",
+                            "callFrom": "checkout",
                         },
                         partition=0,
                     )
@@ -112,6 +118,7 @@ def process_message(message):
                             "order_data": msg["order_data"],
                             "action": "cancel",
                             "is_roll_back": "true",
+                            "callFrom": "checkout",
                         },
                         partition=0,
                     )
@@ -192,6 +199,7 @@ def process_message(message):
                                 "order_data": temp_msg["order_data"],
                                 "action": "cancel",
                                 "is_roll_back": "true",
+                                "callFrom": "checkout",
                             },
                             partition=0,
                         )
@@ -206,6 +214,7 @@ def process_message(message):
                                 "order_data": temp_msg["order_data"],
                                 "action": "pay",
                                 "is_roll_back": "true",
+                                "callFrom": "checkout",
                             },
                             partition=0,
                         )
@@ -235,6 +244,7 @@ def process_message(message):
                                 "affected_items": temp_msg["affected_items"],
                                 "action": "remove",
                                 "is_roll_back": "true",
+                                "callFrom": "checkout",
                             },
                             partition=0,
                         )
@@ -249,6 +259,7 @@ def process_message(message):
                                 "affected_items": temp_msg["affected_items"],
                                 "action": "add",
                                 "is_roll_back": "true",
+                                "callFrom": "checkout",
                             },
                             partition=0,
                         )
@@ -325,6 +336,7 @@ def process_message(message):
                                 "order_data": temp_msg["order_data"],
                                 "action": "cancel",
                                 "is_roll_back": "true",
+                                "callFrom": "checkout",
                             },
                             partition=0,
                         )
@@ -339,6 +351,7 @@ def process_message(message):
                                 "order_data": temp_msg["order_data"],
                                 "action": "pay",
                                 "is_roll_back": "true",
+                                "callFrom": "checkout",
                             },
                             partition=0,
                         )
@@ -368,6 +381,7 @@ def process_message(message):
                                 "affected_items": temp_msg["affected_items"],
                                 "action": "remove",
                                 "is_roll_back": "true",
+                                "callFrom": "checkout",
                             },
                             partition=0,
                         )
@@ -382,6 +396,7 @@ def process_message(message):
                                 "affected_items": temp_msg["affected_items"],
                                 "action": "add",
                                 "is_roll_back": "true",
+                                "callFrom": "checkout",
                             },
                             partition=0,
                         )

@@ -30,6 +30,42 @@ consumer = KafkaConsumer(
 )
 
 
+def add_stock(item_id: str, amount: int):
+    item_key = f"item:{item_id}"
+    pipe = db.pipeline(transaction=True)
+    try:
+        pipe.exists(item_key)
+        pipe.hincrby(item_key, "stock", int(amount))
+        result = pipe.execute()
+        if not result[0]:  # check the result of the EXISTS command
+            return {"error": "Item not found"}, 400
+        return {"done": True}, 200
+    except Exception as e:
+        return str(e), 500
+    finally:
+        pipe.reset()
+
+
+def remove_stock(item_id: str, amount: int):
+    item_key = f"item:{item_id}"
+    pipe = db.pipeline(transaction=True)
+    try:
+        pipe.exists(item_key)
+        pipe.hget(item_key, "stock")
+        result = pipe.execute()
+        if not result[0]:  # check the result of the EXISTS command
+            return {"error": "Item not found"}, 400
+        current_stock = int(result[1])  # get the current stock
+        if current_stock < int(amount):
+            return {"error": "Insufficient stock"}, 400
+        db.hincrby(item_key, "stock", -int(amount))  # subtract from the stock
+        return {"done": True}, 200
+    except Exception as e:
+        return str(e), 500
+    finally:
+        pipe.reset()
+
+
 def modify_stock_list(items: list, amount: int):
     print("in modify stock list function line 32", items, amount)
     pipe = db.pipeline(transaction=True)
@@ -69,78 +105,79 @@ def modify_stock_list(items: list, amount: int):
 
 consumer.assign([TopicPartition("stock_check_topic", 0)])
 for message in consumer:
-    print("stock consumer received message")
+    print("stock consumer received message", message)
     msg = message.value
     transaction_id = message.key
     affected_items = msg["affected_items"]
 
     # reverse_items = []
-    if msg["action"] == "add":
-        response, status_code = modify_stock_list(affected_items, 1)
-        print("received modify_stock_list response", response, status_code)
-        # if msg["is_roll_back"]=="false" and db.get(f"transaction:{transaction_id}"):
-        #     print(f"Transaction {transaction_id} has been processed before, skipping...")
-        #     continue
-        # If this is not a rollback operation, store the transaction_id in Redis to mark this operation as processed
-        if (
-            msg["is_roll_back"] == "false"
-            and db.get(f"transaction:{transaction_id}") is None
-        ):
-            db.set(f"transaction:{transaction_id}", 1)
-        if status_code != 200:
-            producer.send(
-                "stock_check_result_topic",
-                key=transaction_id,
-                value={
-                    "status": "failure",
-                    "affected_items": affected_items,
-                    "is_roll_back": msg["is_roll_back"],
-                    "action": "add",
-                },
-                partition=0,
-            )
-            print("send failure message to stock_check_result_topic")
-        else:
-            producer.send(
-                "stock_check_result_topic",
-                key=transaction_id,
-                value={
-                    "status": "success",
-                    "affected_items": affected_items,
-                    "is_roll_back": msg["is_roll_back"],
-                    "action": "add",
-                },
-                partition=0,
-            )
-            print("send success message to stock_check_result_topic")
-        # reverse_items.append(item_id)
-    elif msg["action"] == "remove":
-        response, status_code = modify_stock_list(affected_items, -1)
-        print("received modify_stock_list response", response, status_code)
-        if status_code != 200:
-            producer.send(
-                "stock_check_result_topic",
-                key=transaction_id,
-                value={
-                    "status": "failure",
-                    "affected_items": affected_items,
-                    "is_roll_back": msg["is_roll_back"],
-                    "action": "remove",
-                },
-                partition=0,
-            )
-            print("send failure message to stock_check_result_topic remove")
-        else:
-            producer.send(
-                "stock_check_result_topic",
-                key=transaction_id,
-                value={
-                    "status": "success",
-                    "affected_items": affected_items,
-                    "is_roll_back": msg["is_roll_back"],
-                    "action": "remove",
-                },
-                partition=0,
-            )
-            print("send success message to stock_check_result_topic remove")
-        # reverse_items.append(item_id)
+    if msg["callFrom"] == "checkout":
+        if msg["action"] == "add":
+            response, status_code = modify_stock_list(affected_items, 1)
+            print("received modify_stock_list response", response, status_code)
+            # if msg["is_roll_back"]=="false" and db.get(f"transaction:{transaction_id}"):
+            #     print(f"Transaction {transaction_id} has been processed before, skipping...")
+            #     continue
+            # If this is not a rollback operation, store the transaction_id in Redis to mark this operation as processed
+            if (
+                msg["is_roll_back"] == "false"
+                and db.get(f"transaction:{transaction_id}") is None
+            ):
+                db.set(f"transaction:{transaction_id}", 1)
+            if status_code != 200:
+                producer.send(
+                    "stock_check_result_topic",
+                    key=transaction_id,
+                    value={
+                        "status": "failure",
+                        "affected_items": affected_items,
+                        "is_roll_back": msg["is_roll_back"],
+                        "action": "add",
+                    },
+                    partition=0,
+                )
+                print("send failure message to stock_check_result_topic")
+            else:
+                producer.send(
+                    "stock_check_result_topic",
+                    key=transaction_id,
+                    value={
+                        "status": "success",
+                        "affected_items": affected_items,
+                        "is_roll_back": msg["is_roll_back"],
+                        "action": "add",
+                    },
+                    partition=0,
+                )
+                print("send success message to stock_check_result_topic")
+            # reverse_items.append(item_id)
+        elif msg["action"] == "remove":
+            response, status_code = modify_stock_list(affected_items, -1)
+            print("received modify_stock_list response", response, status_code)
+            if status_code != 200:
+                producer.send(
+                    "stock_check_result_topic",
+                    key=transaction_id,
+                    value={
+                        "status": "failure",
+                        "affected_items": affected_items,
+                        "is_roll_back": msg["is_roll_back"],
+                        "action": "remove",
+                    },
+                    partition=0,
+                )
+                print("send failure message to stock_check_result_topic remove")
+            else:
+                producer.send(
+                    "stock_check_result_topic",
+                    key=transaction_id,
+                    value={
+                        "status": "success",
+                        "affected_items": affected_items,
+                        "is_roll_back": msg["is_roll_back"],
+                        "action": "remove",
+                    },
+                    partition=0,
+                )
+                print("send success message to stock_check_result_topic remove")
+            # reverse_items.append(item_id)

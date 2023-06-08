@@ -300,6 +300,7 @@ def checkout(order_id):
                 "affected_items": list_data,
                 "action": "remove",
                 "is_roll_back": "false",
+                "callFrom": "checkout",
             },
             key=global_transaction_id,
             partition=0,
@@ -307,7 +308,12 @@ def checkout(order_id):
         # print("sending payment processing message of order_id: ", order_id)
         producer.send(
             "payment_processing_topic",
-            value={"order_data": order_data, "action": "pay", "is_roll_back": "false"},
+            value={
+                "order_data": order_data,
+                "action": "pay",
+                "is_roll_back": "false",
+                "callFrom": "checkout",
+            },
             key=global_transaction_id,
             partition=0,
         )
